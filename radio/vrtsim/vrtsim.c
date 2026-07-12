@@ -179,6 +179,10 @@ typedef struct {
   double ul_mu_tv_freq;                                // time-varying channel: angle oscillation rate (Hz, sim time); 0=static
   double ul_mu_tv_amp;                                 // oscillation amplitude (cycles/antenna); UEs counter-rotate +/-amp
   c16_t ul_mu_w[MAX_NUM_UES][MAX_NUM_ANTENNAS_TX];     // per-(UE,antenna) Q15 steering weight
+  int ul_mu_ds_delay;                                  // delay-spread 2nd tap: delay in samples; 0=off
+  double ul_mu_ds_gain;                                // 2nd-tap linear gain (parsed from dB)
+  double ul_mu_ds_angoff;                              // 2nd-tap extra steering angle (cycles/antenna)
+  c16_t ul_mu_w2[MAX_NUM_UES][MAX_NUM_ANTENNAS_TX];    // per-(UE,antenna) Q15 weight of the delayed tap
   double rx_freq;
   double tx_bw;
   int tx_num_channels;
@@ -420,6 +424,27 @@ static void vrtsim_readconfig(vrtsim_state_t *vrtsim_state)
       vrtsim_state->ul_mu_tv_amp = atof(c + 1);
     LOG_A(HW, "VRTSIM: UL MU time-varying channel f=%.3f Hz amp=%.3f cyc/ant\n",
           vrtsim_state->ul_mu_tv_freq, vrtsim_state->ul_mu_tv_amp);
+  }
+  // Delay spread: VRTSIM_UL_MU_DS="D_samples[,gain_db[,ang2_off]]" adds a second UL tap delayed
+  // D samples (~0.52us per 64 @122.88Msps; keep within the CP, D<=250), gain_db relative to tap 1
+  // (default -3), steered at angle+ang2_off (default +0.25 cyc/ant -> spatially distinct). Makes
+  // the channel frequency-selective (ripple period fs/D) in both frequency and space. Applied only
+  // while MU steering is active (same attach-first gate).
+  vrtsim_state->ul_mu_ds_delay = 0;
+  vrtsim_state->ul_mu_ds_gain = pow(10.0, -3.0 / 20.0);
+  vrtsim_state->ul_mu_ds_angoff = 0.25;
+  const char *ulds = getenv("VRTSIM_UL_MU_DS");
+  if (ulds != NULL && ulds[0] != '\0') {
+    vrtsim_state->ul_mu_ds_delay = atoi(ulds);
+    const char *dsc = strchr(ulds, ',');
+    if (dsc) {
+      vrtsim_state->ul_mu_ds_gain = pow(10.0, atof(dsc + 1) / 20.0);
+      const char *dsc2 = strchr(dsc + 1, ',');
+      if (dsc2)
+        vrtsim_state->ul_mu_ds_angoff = atof(dsc2 + 1);
+    }
+    LOG_A(HW, "VRTSIM: UL MU delay-spread tap2 D=%d samples gain=%.3f angoff=%.3f cyc/ant\n",
+          vrtsim_state->ul_mu_ds_delay, vrtsim_state->ul_mu_ds_gain, vrtsim_state->ul_mu_ds_angoff);
   }
 #ifdef OAI_VRTSIM_TAPS_CLIENT
   if (vrtsim_state->taps_socket) {
@@ -1302,6 +1327,14 @@ static int vrtsim_read(openair0_device_t *device, openair0_timestamp_t *ptimesta
             vrtsim_state->ul_mu_w[u][a].r = (int16_t)lround(cos(ph) * 32767.0);
             vrtsim_state->ul_mu_w[u][a].i = (int16_t)lround(sin(ph) * 32767.0);
           }
+          if (vrtsim_state->ul_mu_ds_delay > 0) {
+            const double g = vrtsim_state->ul_mu_ds_gain;
+            for (int a = 0; a < nbAnt && a < MAX_NUM_ANTENNAS_TX; a++) {
+              double ph2 = 2.0 * M_PI * (double)a * (ang + vrtsim_state->ul_mu_ds_angoff);
+              vrtsim_state->ul_mu_w2[u][a].r = (int16_t)lround(cos(ph2) * 32767.0 * g);
+              vrtsim_state->ul_mu_w2[u][a].i = (int16_t)lround(sin(ph2) * 32767.0 * g);
+            }
+          }
           if (!vrtsim_state->ul_mu_steer_ready)
             LOG_A(HW, "VRTSIM: UL MU steer UE%d angle=%.3f cyc/ant w[0..%d]=[%d,%d %d,%d ...]\n",
                   u, ang, nbAnt - 1, vrtsim_state->ul_mu_w[u][0].r, vrtsim_state->ul_mu_w[u][0].i,
@@ -1362,6 +1395,33 @@ static int vrtsim_read(openair0_device_t *device, openair0_timestamp_t *ptimesta
               for (int i = 0; i < nsamps * 2; i++) {
                 int32_t sum = (int32_t)out[i] + (int32_t)in[i];
                 out[i] = (int16_t)((sum > 32767) ? 32767 : (sum < -32768) ? -32768 : sum);
+              }
+            }
+          }
+          // Delay-spread tap 2: the same UE stream D samples EARLIER with the distinct spatial
+          // signature w2 (already gain-scaled). Reading older samples is always safe (no TOO_LATE);
+          // reuses ul_combine_buffer after tap 1's adds completed. Skipped until read_sample >= D.
+          if (vrtsim_state->ul_mu_steer && vrtsim_state->ul_mu_steer_active
+              && vrtsim_state->ul_mu_ds_delay > 0
+              && read_sample >= (uint64_t)vrtsim_state->ul_mu_ds_delay) {
+            shm_td_iq_channel_rx(vrtsim_state->channel,
+                                 read_sample - vrtsim_state->ul_mu_ds_delay,
+                                 nsamps,
+                                 base + t,
+                                 vrtsim_state->ul_combine_buffer);
+            const int16_t *in2 = (const int16_t *)vrtsim_state->ul_combine_buffer;
+            for (int aarx = 0; aarx < nbAnt; aarx++) {
+              if (samplesVoid[aarx] == NULL)
+                continue;
+              int16_t *out = (int16_t *)samplesVoid[aarx];
+              const c16_t w = vrtsim_state->ul_mu_w2[u][aarx];
+              for (int i = 0; i < nsamps; i++) {
+                int32_t sr = (int32_t)in2[2 * i], si = (int32_t)in2[2 * i + 1];
+                int32_t pr = (sr * w.r - si * w.i) >> 15;
+                int32_t pi = (sr * w.i + si * w.r) >> 15;
+                int32_t or_ = (int32_t)out[2 * i] + pr, oi = (int32_t)out[2 * i + 1] + pi;
+                out[2 * i]     = (int16_t)((or_ > 32767) ? 32767 : (or_ < -32768) ? -32768 : or_);
+                out[2 * i + 1] = (int16_t)((oi > 32767) ? 32767 : (oi < -32768) ? -32768 : oi);
               }
             }
           }
