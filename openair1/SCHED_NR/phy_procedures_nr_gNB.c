@@ -43,6 +43,22 @@
 
 //#define DEBUG_RXDATA
 //#define SRS_IND_DEBUG
+// Per-antenna, PRE-COMBINING SNR: what a single RX antenna sees in the air, before MRC.
+// This is the physically meaningful link quality (independent of how many antennas we combine);
+// the aggregate SNR printed elsewhere sums signal AND noise over antennas so the array gain
+// cancels, and it is measured against an idle-subband noise floor.
+static const char *ul_per_ant_snr_str(PHY_VARS_gNB *gNB, NR_gNB_PUSCH *pusch, char *buf, size_t len)
+{
+  int n = 0;
+  n += snprintf(buf + n, len - n, "[");
+  for (int a = 0; a < gNB->frame_parms.nb_antennas_rx && n < (int)len - 8; a++)
+    n += snprintf(buf + n, len - n, "%s%.1f",
+                  a ? " " : "",
+                  (dB_fixed_x10(pusch->ulsch_power[a]) - dB_fixed_x10(pusch->ulsch_noise_power[a])) / 10.0);
+  snprintf(buf + n, len - n, "]");
+  return buf;
+}
+
 static void nr_fill_indication(PHY_VARS_gNB *gNB,
                                int frame,
                                int slot_rx,
@@ -517,7 +533,7 @@ static int nr_ulsch_procedures(PHY_VARS_gNB *gNB, int frame_rx, int slot_rx, boo
       static int ulsch_ack_trace_count = 0;
       if (ulsch_ack_trace_count < 32) {
         LOG_I(PHY,
-              "ULSCH ACK trace %d.%d rnti %04x harq %d round %d rv %d crc_valid %d processed %d/%d abort %d dtx %d TBS %d rb %d+%d sym %d+%d mcs %d Qm %d SNR %.1f dB TAest %d\n",
+              "ULSCH ACK trace %d.%d rnti %04x harq %d round %d rv %d crc_valid %d processed %d/%d abort %d dtx %d TBS %d rb %d+%d sym %d+%d mcs %d Qm %d SNR %.1f dB preSNR %s dB TAest %d\n",
               ulsch->frame,
               ulsch->slot,
               ulsch->rnti,
@@ -537,6 +553,7 @@ static int nr_ulsch_procedures(PHY_VARS_gNB *gNB, int frame_rx, int slot_rx, boo
               pusch_pdu->mcs_index,
               pusch_pdu->qam_mod_order,
               (dB_fixed_x10(pusch->ulsch_power_tot) - dB_fixed_x10(pusch->ulsch_noise_power_tot)) / 10.0,
+              ul_per_ant_snr_str(gNB, pusch, (char[192]){0}, 192),
               gNB->ulsch[ULSCH_id].delay.est_delay);
         ulsch_ack_trace_count++;
       }
@@ -563,7 +580,7 @@ static int nr_ulsch_procedures(PHY_VARS_gNB *gNB, int frame_rx, int slot_rx, boo
       static int ulsch_nak_trace_count = 0;
       if (ulsch_nak_trace_count < 32) {
         LOG_W(PHY,
-              "ULSCH NAK trace %d.%d rnti %04x harq %d round %d rv %d crc_valid %d processed %d/%d abort %d dtx %d TBS %d rb %d+%d sym %d+%d mcs %d Qm %d SNR %.1f dB TAest %d\n",
+              "ULSCH NAK trace %d.%d rnti %04x harq %d round %d rv %d crc_valid %d processed %d/%d abort %d dtx %d TBS %d rb %d+%d sym %d+%d mcs %d Qm %d SNR %.1f dB preSNR %s dB TAest %d\n",
               ulsch->frame,
               ulsch->slot,
               ulsch->rnti,
@@ -583,6 +600,7 @@ static int nr_ulsch_procedures(PHY_VARS_gNB *gNB, int frame_rx, int slot_rx, boo
               pusch_pdu->mcs_index,
               pusch_pdu->qam_mod_order,
               (dB_fixed_x10(pusch->ulsch_power_tot) - dB_fixed_x10(pusch->ulsch_noise_power_tot)) / 10.0,
+              ul_per_ant_snr_str(gNB, pusch, (char[192]){0}, 192),
               gNB->ulsch[ULSCH_id].delay.est_delay);
         ulsch_nak_trace_count++;
       }
