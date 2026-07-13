@@ -64,7 +64,7 @@
 // to pin the 106-PRB "wire carries zero PRACH payloads" bug: src-zeros vs dst-zeros. Bounded
 // prints (symbol-0 first-1024 + nonzero events) — same perturbation class as the DU side.
 #define ORU_PRACH_UPLANE_DEBUG 1
-#define MAX_NUM_ANTENNAS 4
+#define MAX_NUM_ANTENNAS 16  // was 4; xran lib is 16-native (XRAN_MAX_ANTENNA_NR); arrays/guards only
 #define XRAN_GET_MU_FROM_SECT_ID(sectId) (sectId/XRAN_MAX_SECTIONS_PER_SLOT)
 
 notifiedFIFO_t ru_dl_sync_fifo;

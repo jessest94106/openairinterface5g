@@ -101,7 +101,11 @@ void oai_xran_fh_rx_callback(void *pCallbackTag, xran_status_t status)
       struct xran_fh_config *fh_config = get_xran_fh_config(ru_idx);
       oran_buf_list_t *bufs = get_xran_buffers(ru_idx);
       for (uint16_t cc_id = 0; cc_id < 1 /* fh_config->nCC */; cc_id++) { // OAI does not support multiple CC yet.
-        for(uint32_t ant_id = 0; ant_id < fh_config->neAxc; ant_id++) {
+        // dstcp = the UL PRB maps: bound by the UL antenna count (neAxcUl under asymmetric eAxC).
+        // Bounding by neAxc (the DL count) left antennas 2..7 un-reset -> their nSecDesc climbed to
+        // XRAN_MAX_FRAGMENT -> xran dropped their packets -> DU death. Latent upstream (DL==UL there).
+        uint32_t ul_eaxc = fh_config->neAxcUl > 0 ? fh_config->neAxcUl : fh_config->neAxc;
+        for(uint32_t ant_id = 0; ant_id < ul_eaxc; ant_id++) {
           struct xran_prb_map *pRbMap = (struct xran_prb_map *)bufs->dstcp[ant_id][tti % XRAN_N_FE_BUF_LEN].pBuffers->pData;
           AssertFatal(pRbMap != NULL, "(%d:%d:%d)pRbMap == NULL. Aborting.\n", cc_id, tti % XRAN_N_FE_BUF_LEN, ant_id);
 

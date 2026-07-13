@@ -986,8 +986,20 @@ static bool set_fh_config(void *mplane_api,
   fh_config->dpdk_port = ru_idx; // DPDK port number used for FH
   fh_config->sector_id = 0; // Band sector ID for FH; not used in xran
   fh_config->nCC = 1; // number of Component carriers supported on FH; M-plane info
-  fh_config->neAxc = RTE_MAX(oai0->tx_num_channels / num_rus, oai0->rx_num_channels / num_rus); // number of eAxc supported on one CC = max(PDSCH, PUSCH)
-  fh_config->neAxcUl = 0; // number of eAxc supported on one CC for UL direction = PUSCH; used only if XRAN_CATEGORY_B
+  // Asymmetric eAxC (with the patched libxran honoring neAxcUl under CAT_A): DL count = PDSCH
+  // antennas, UL count = PUSCH antennas. The old max() inflated the DL to 8 eAxC on an 8-RX
+  // gNB — the DU sprayed 7 junk DL streams the RU dropped ("asymmetric neAxc guard") and DL died.
+  // OAI_FHI_STOCK_EAXC=1 restores the stock symmetric config (neAxc=max(tx,rx), neAxcUl=0).
+  const char *stock_eaxc = getenv("OAI_FHI_STOCK_EAXC");
+  if (stock_eaxc != NULL && stock_eaxc[0] == '1') {
+    fh_config->neAxc = RTE_MAX(oai0->tx_num_channels / num_rus, oai0->rx_num_channels / num_rus);
+    fh_config->neAxcUl = 0;
+  } else {
+    // Keep DL at >=2 eAxC: neAxc=1 (and gNB nb_tx=2) both break the DL chain (2x2 bisect
+    // 2026-07-12); 2 DL eAxC with nb_tx=1 is the known-good DL geometry every run used.
+    fh_config->neAxc = RTE_MAX(oai0->tx_num_channels / num_rus, 2);
+    fh_config->neAxcUl = oai0->rx_num_channels / num_rus;
+  }
   fh_config->nAntElmTRx = 0; // number of antenna elements for TX and RX = SRS; used only if XRAN_CATEGORY_B
   fh_config->nDLFftSize = oai0->split7.fftSize; // DL FFT size; not used in xran
   fh_config->nULFftSize = oai0->split7.fftSize; // UL FFT size; not used in xran
@@ -1064,7 +1076,7 @@ static bool set_fh_config(void *mplane_api,
   fh_config->GPS_Alpha = gps_alpha; // refers to alpha as defined in section 9.7.2 of ORAN spec. this value should be alpha*(1/1.2288ns), range 0 - 1e7 (ns); offset_nsec = (pConf->GPS_Beta - offset_sec * 100) * 1e7 + pConf->GPS_Alpha
   fh_config->GPS_Beta = gps_beta; // beta value as defined in section 9.7.2 of ORAN spec. range -32767 ~ +32767; offset_sec = pConf->GPS_Beta / 100
 
-  if (!set_fh_prach_config(mplane_api, oai0, fh_config->neAxc, prachp, nprach, &fh_config->prach_conf, liteon_prach_eAxC_offset))
+  if (!set_fh_prach_config(mplane_api, oai0, RTE_MAX(fh_config->neAxc, fh_config->neAxcUl), prachp, nprach, &fh_config->prach_conf, liteon_prach_eAxC_offset))
     return false;
   /* SRS only used if XRAN_CATEGORY_B
     Note: srs_config->eAxC_offset >= prach_config->eAxC_offset + PRACH */

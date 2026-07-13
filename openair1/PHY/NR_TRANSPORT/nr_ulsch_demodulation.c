@@ -696,219 +696,32 @@ static uint8_t nr_ulsch_mmse_2layers(int **rxdataF_comp,
 {
   uint32_t nb_rb_0 = length/12 + ((length%12)?1:0);
 
-  /* we need at least alignment to 16 bytes, let's put 32 to be sure
-   * (maybe not necessary but doesn't hurt)
-   */
-  c16_t conjch00_ch01[12 * nb_rb] __attribute__((aligned(32)));
-  c16_t conjch01_ch00[12 * nb_rb] __attribute__((aligned(32)));
-  c16_t conjch10_ch11[12 * nb_rb] __attribute__((aligned(32)));
-  c16_t conjch11_ch10[12 * nb_rb] __attribute__((aligned(32)));
-  c16_t conjch00_ch00[12 * nb_rb] __attribute__((aligned(32)));
-  c16_t conjch01_ch01[12 * nb_rb] __attribute__((aligned(32)));
-  c16_t conjch10_ch10[12 * nb_rb] __attribute__((aligned(32)));
-  c16_t conjch11_ch11[12 * nb_rb] __attribute__((aligned(32)));
-  c16_t conjch20_ch20[12 * nb_rb] __attribute__((aligned(32)));
-  c16_t conjch21_ch21[12 * nb_rb] __attribute__((aligned(32)));
-  c16_t conjch30_ch30[12 * nb_rb] __attribute__((aligned(32)));
-  c16_t conjch31_ch31[12 * nb_rb] __attribute__((aligned(32)));
-  c16_t conjch20_ch21[12 * nb_rb] __attribute__((aligned(32)));
-  c16_t conjch30_ch31[12 * nb_rb] __attribute__((aligned(32)));
-  c16_t conjch21_ch20[12 * nb_rb] __attribute__((aligned(32)));
-  c16_t conjch31_ch30[12 * nb_rb] __attribute__((aligned(32)));
-
   c16_t af_mf_00[12 * nb_rb] __attribute__((aligned(32)));
   c16_t af_mf_01[12 * nb_rb] __attribute__((aligned(32)));
   c16_t af_mf_10[12 * nb_rb] __attribute__((aligned(32)));
   c16_t af_mf_11[12 * nb_rb] __attribute__((aligned(32)));
   uint32_t determ_fin[12*nb_rb] __attribute__((aligned(32)));
 
-  c16_t *ch00, *ch01, *ch10, *ch11;
-  c16_t *ch20, *ch30, *ch21, *ch31;
-  switch (nb_rx_ant) {
-    case 2://
-      ch00 = ul_ch_estimates_ext[0][0];
-      ch01 = ul_ch_estimates_ext[1][0];
-      ch10 = ul_ch_estimates_ext[0][1];
-      ch11 = ul_ch_estimates_ext[1][1];
-      ch20 = NULL;
-      ch21 = NULL;
-      ch30 = NULL;
-      ch31 = NULL;
-      break;
-
-    case 4://
-      ch00 = ul_ch_estimates_ext[0][0];
-      ch01 = ul_ch_estimates_ext[1][0];
-      ch10 = ul_ch_estimates_ext[0][1];
-      ch11 = ul_ch_estimates_ext[1][1];
-      ch20 = ul_ch_estimates_ext[0][2];
-      ch21 = ul_ch_estimates_ext[1][2];
-      ch30 = ul_ch_estimates_ext[0][3];
-      ch31 = ul_ch_estimates_ext[1][3];
-      break;
-
-    default:
-      return -1;
-      break;
-  }
-
-  /* 1- Compute the rx channel matrix after compensation: (1/2^log2_max)x(H_herm x H)
-   * for n_rx = 2
-   * |conj_H_00       conj_H_10|    | H_00         H_01|   |(conj_H_00xH_00+conj_H_10xH_10)   (conj_H_00xH_01+conj_H_10xH_11)|
-   * |                         |  x |                  | = |                                                                 |
-   * |conj_H_01       conj_H_11|    | H_10         H_11|   |(conj_H_01xH_00+conj_H_11xH_10)   (conj_H_01xH_01+conj_H_11xH_11)|
-   *
-   */
-
-  if (nb_rx_ant >= 2) {
-    // (1/2^log2_maxh)*conj_H_00xH_00: (1/(64*2))conjH_00*H_00*2^15
-    nr_ulsch_conjch0_mult_ch1(ch00,
-                        ch00,
-                        conjch00_ch00,
-                        nb_rb_0,
-                        shift);
-    // (1/2^log2_maxh)*conj_H_10xH_10: (1/(64*2))conjH_10*H_10*2^15
-    nr_ulsch_conjch0_mult_ch1(ch10,
-                        ch10,
-                        conjch10_ch10,
-                        nb_rb_0,
-                        shift);
-    // conj_H_00xH_01
-    nr_ulsch_conjch0_mult_ch1(ch00,
-                        ch01,
-                        conjch00_ch01,
-                        nb_rb_0,
-                        shift); // this shift is equal to the channel level log2_maxh
-    // conj_H_10xH_11
-    nr_ulsch_conjch0_mult_ch1(ch10,
-                        ch11,
-                        conjch10_ch11,
-                        nb_rb_0,
-                        shift);
-    // conj_H_01xH_01
-    nr_ulsch_conjch0_mult_ch1(ch01,
-                        ch01,
-                        conjch01_ch01,
-                        nb_rb_0,
-                        shift);
-    // conj_H_11xH_11
-    nr_ulsch_conjch0_mult_ch1(ch11,
-                        ch11,
-                        conjch11_ch11,
-                        nb_rb_0,
-                        shift);
-    // conj_H_01xH_00
-    nr_ulsch_conjch0_mult_ch1(ch01,
-                        ch00,
-                        conjch01_ch00,
-                        nb_rb_0,
-                        shift);
-    // conj_H_11xH_10
-    nr_ulsch_conjch0_mult_ch1(ch11,
-                        ch10,
-                        conjch11_ch10,
-                        nb_rb_0,
-                        shift);
-  }
-  if (nb_rx_ant == 4) {
-    // (1/2^log2_maxh)*conj_H_20xH_20: (1/(64*2*16))conjH_20*H_20*2^15
-    nr_ulsch_conjch0_mult_ch1(ch20,
-                        ch20,
-                        conjch20_ch20,
-                        nb_rb_0,
-                        shift);
-
-    // (1/2^log2_maxh)*conj_H_30xH_30: (1/(64*2*4))conjH_30*H_30*2^15
-    nr_ulsch_conjch0_mult_ch1(ch30,
-                        ch30,
-                        conjch30_ch30,
-                        nb_rb_0,
-                        shift);
-
-    // (1/2^log2_maxh)*conj_H_20xH_20: (1/(64*2))conjH_20*H_20*2^15
-    nr_ulsch_conjch0_mult_ch1(ch20,
-                        ch21,
-                        conjch20_ch21,
-                        nb_rb_0,
-                        shift);
-
-    nr_ulsch_conjch0_mult_ch1(ch30,
-                        ch31,
-                        conjch30_ch31,
-                        nb_rb_0,
-                        shift);
-
-    nr_ulsch_conjch0_mult_ch1(ch21,
-                        ch21,
-                        conjch21_ch21,
-                        nb_rb_0,
-                        shift);
-
-    nr_ulsch_conjch0_mult_ch1(ch31,
-                        ch31,
-                        conjch31_ch31,
-                        nb_rb_0,
-                        shift);
-
-    // (1/2^log2_maxh)*conj_H_20xH_20: (1/(64*2))conjH_20*H_20*2^15
-    nr_ulsch_conjch0_mult_ch1(ch21,
-                        ch20,
-                        conjch21_ch20,
-                        nb_rb_0,
-                        shift);
-
-    nr_ulsch_conjch0_mult_ch1(ch31,
-                        ch30,
-                        conjch31_ch30,
-                        nb_rb_0,
-                        shift);
-
-    nr_ulsch_construct_HhH_elements(conjch00_ch00,
-                              conjch01_ch01,
-                              conjch11_ch11,
-                              conjch10_ch10,//
-                              conjch20_ch20,
-                              conjch21_ch21,
-                              conjch30_ch30,
-                              conjch31_ch31,
-                              conjch00_ch01,
-                              conjch01_ch00,
-                              conjch10_ch11,
-                              conjch11_ch10,//
-                              conjch20_ch21,
-                              conjch21_ch20,
-                              conjch30_ch31,
-                              conjch31_ch30,
-                              af_mf_00,
-                              af_mf_01,
-                              af_mf_10,
-                              af_mf_11,
-                              nb_rb_0,
-                              symbol);
-  }
-  if (nb_rx_ant == 2) {
-    nr_ulsch_construct_HhH_elements(conjch00_ch00,
-                              conjch01_ch01,
-                              conjch11_ch11,
-                              conjch10_ch10,//
-                              NULL,
-                              NULL,
-                              NULL,
-                              NULL,
-                              conjch00_ch01,
-                              conjch01_ch00,
-                              conjch10_ch11,
-                              conjch11_ch10,//
-                              NULL,
-                              NULL,
-                              NULL,
-                              NULL,
-                              af_mf_00,
-                              af_mf_01,
-                              af_mf_10,
-                              af_mf_11,
-                              nb_rb_0,
-                              symbol);
+  /* H is [nb_rx_ant x 2] (layer 0 = self, layer 1 = partner); H^H*H is ALWAYS 2x2:
+   *   af_mf_XY[re] = sum_a conj(H[a][X]) * H[a][Y]   (saturating int16 accumulation)
+   * Generic over antenna count — replaces the hand-unrolled nb_rx_ant==2/4 switch, which
+   * returned -1 for 8/16 and blocked the antenna ladder. */
+  c16_t hh_prod[12 * nb_rb] __attribute__((aligned(32)));
+  memset(af_mf_00, 0, 12 * nb_rb * sizeof(c16_t));
+  memset(af_mf_01, 0, 12 * nb_rb * sizeof(c16_t));
+  memset(af_mf_10, 0, 12 * nb_rb * sizeof(c16_t));
+  memset(af_mf_11, 0, 12 * nb_rb * sizeof(c16_t));
+  for (int aa = 0; aa < nb_rx_ant; aa++) {
+    c16_t *h0 = ul_ch_estimates_ext[0][aa];
+    c16_t *h1 = ul_ch_estimates_ext[1][aa];
+    c16_t *const pairs[4][3] = {{h0, h0, af_mf_00}, {h0, h1, af_mf_01}, {h1, h0, af_mf_10}, {h1, h1, af_mf_11}};
+    for (int e = 0; e < 4; e++) {
+      nr_ulsch_conjch0_mult_ch1(pairs[e][0], pairs[e][1], hh_prod, nb_rb_0, shift);
+      simde__m128i *dst = (simde__m128i *)pairs[e][2];
+      const simde__m128i *src = (const simde__m128i *)hh_prod;
+      for (uint32_t k = 0; k < 3 * nb_rb_0; k++)
+        dst[k] = simde_mm_adds_epi16(dst[k], src[k]);
+    }
   }
 
   // Add noise_var such that: H^h * H + noise_var * I
