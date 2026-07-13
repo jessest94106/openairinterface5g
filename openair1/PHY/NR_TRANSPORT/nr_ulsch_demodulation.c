@@ -1393,7 +1393,14 @@ static void nr_pusch_symbol_processing(void *arg)
   // later when chest is done; ans completes on the successful re-run. MU-gated; default unchanged.
   { static int mu_rq = -1; if (mu_rq < 0) { const char *e = getenv("OAI_UL_MU_IRC"); mu_rq = (e && e[0]) ? 1 : 0; }
     extern volatile int g_mu_mimo_active;
-    if (mu_rq && g_mu_mimo_active && rdata->bounces < 2) { // backstop only: two-phase ordering makes estimates ready before decode
+    // OAI_UL_CHEST_GUARD=1: apply the unready-estimate requeue in ALL modes, not only MU. The race
+    // is antenna-count driven (chest work scales with nb_rx): at 8 RX the DMRS task may not finish
+    // before the parallel data-symbol tasks read log2_maxh -> zero channel -> zero LLRs -> the TB
+    // dies at any SNR. Gating this on MU meant single-UE 8-RX ate the failures and OLLA was beaten
+    // down to MCS 5-9, while co-scheduled UEs (guard active) reached MCS 25 on the same channel.
+    static int chest_guard = -1;
+    if (chest_guard < 0) { const char *e = getenv("OAI_UL_CHEST_GUARD"); chest_guard = (e && e[0]) ? atoi(e) : 0; }
+    if (((mu_rq && g_mu_mimo_active) || chest_guard) && rdata->bounces < 2) { // backstop only: two-phase ordering makes estimates ready before decode
       // partner estimate too: a co-scheduled decode with an unready PARTNER estimate skips IRC and
       // falls to MRC with the interference still on it (parte leak) — same race, same cure: defer.
       int unready = (pusch_vars->log2_maxh == 0);

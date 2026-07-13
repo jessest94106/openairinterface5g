@@ -60,7 +60,7 @@
 // Simulator role
 typedef enum { ROLE_SERVER = 1, ROLE_CLIENT } role;
 
-#define MAX_NUM_ANTENNAS_TX 4
+#define MAX_NUM_ANTENNAS_TX 16  // was 4; sized for the 8/16-RX gNB ladder
 // 4096 samples = 33 us of history @122.88 Msps: enough for any in-CP TDL delay spread. Was 256
 // (2.08 us), which silently truncated large-DS taps in the sparse path.
 #define SAVED_SAMPLES_LEN 4096
@@ -1631,7 +1631,28 @@ static int vrtsim_read(openair0_device_t *device, openair0_timestamp_t *ptimesta
         }
       }
     } else {
-      /* Single-UE server UL read */
+      /* Single-UE server UL read. With chanmod/taps/cirdb the client convolves its TX with a
+       * per-(UE, gNB-antenna) channel and writes ONE stream PER gNB ANTENNA (global index
+       * ue_id*nbAnt + a; ue_id = 0 here). Route stream a into antenna a so each antenna carries
+       * its own fading realisation. The old path read stream 0 and memcpy'd it into every antenna
+       * = rank-1 duplicate: no spatial diversity, no array gain, all antennas fade together — at
+       * 8 RX that collapsed single-UE MCS to ~9 while co-scheduled UEs (multi-UE branch, already
+       * routed per antenna) reached MCS 25 on the same channel. Without chanmod the client writes
+       * a single stream, so the duplicate is still correct there. */
+      const bool ul_chanmod = vrtsim_state->chanmod || vrtsim_state->taps_socket || vrtsim_state->use_cirdb;
+      if (ul_chanmod) {
+        for (int aarx = 0; aarx < nbAnt; aarx++) {
+          if (samplesVoid[aarx] == NULL)
+            continue;
+          int ret_a = shm_td_iq_channel_rx(vrtsim_state->channel, read_sample, nsamps, aarx, samplesVoid[aarx]);
+          if (ret_a == CHANNEL_ERROR_TOO_LATE)
+            vrtsim_state->rx_samples_late += nsamps;
+          else if (ret_a == CHANNEL_ERROR_TOO_EARLY)
+            vrtsim_state->rx_early += 1;
+          if (ret_a != 0 && rx_ret == 0)
+            rx_ret = ret_a;
+        }
+      } else {
       int ret = shm_td_iq_channel_rx(vrtsim_state->channel, read_sample, nsamps, 0, samplesVoid[0]);
       if (ret == CHANNEL_ERROR_TOO_LATE) {
         vrtsim_state->rx_samples_late += nsamps;
@@ -1642,6 +1663,7 @@ static int vrtsim_read(openair0_device_t *device, openair0_timestamp_t *ptimesta
       for (int aarx = 1; aarx < nbAnt; aarx++) {
         if (samplesVoid[aarx] != NULL)
           memcpy(samplesVoid[aarx], samplesVoid[0], nsamps * sizeof(sample_t));
+      }
       }
       // Per-antenna UL attenuation (right-shift) to de-saturate the coherent Nrx combine: with Nrx identical
       // copies summed at the gNB, a full-scale UE PRACH overflows the correlator (capped 48 dB, sidelobes
