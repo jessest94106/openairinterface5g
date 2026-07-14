@@ -143,7 +143,14 @@ typedef struct {
   float *Doppler_phase_cur;
   /// flag indicating if channel direction is UL or DL
   bool is_uplink;
+  /// TR 38.901 CDL state (cdl_state_t*), NULL for non-CDL models
+  void *cdl_state;
 } channel_desc_t;
+
+/* CDL only: re-draw the ray realization with a per-UE azimuth rotation (degrees, rotates all
+ * cluster AoA/AoD per TR 38.901 §7.7.5.1 angle translation) and refresh desc->a. No-op for
+ * non-CDL descriptors. Uses the current taus RNG state (seed per UE before calling). */
+void cdl_reinit_azimuth(channel_desc_t *desc, double az_deg);
 
 typedef struct {
   /// Number of sectors (set to 1 in case of an omnidirectional antenna)
@@ -237,6 +244,9 @@ typedef enum {
   EPA_high,
   SAT_LEO_TRANS,
   SAT_LEO_REGEN,
+  CDL_A,
+  CDL_B,
+  CDL_C,
 } SCM_t;
 #define CHANNELMOD_MAP_INIT \
   {"custom",custom},\
@@ -274,6 +284,9 @@ typedef enum {
   {"EPA_high",EPA_high},\
   {"SAT_LEO_TRANS",SAT_LEO_TRANS},\
   {"SAT_LEO_REGEN",SAT_LEO_REGEN},\
+  {"CDL_A",CDL_A},\
+  {"CDL_B",CDL_B},\
+  {"CDL_C",CDL_C},\
   {NULL, -1}
 
 #define CONFIG_HLP_SNR     "Set average SNR in dB (for --siml1 option)\n"

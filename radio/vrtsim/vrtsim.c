@@ -864,6 +864,27 @@ static int vrtsim_connect(openair0_device_t *device)
       if (vrtsim_state->role == ROLE_CLIENT)
         set_taus_seed(0x5eed0000u + (unsigned int)vrtsim_state->ue_id);
       load_channel_model(vrtsim_state);
+      // CDL per-UE placement: VRTSIM_CDL_UE_AZ_DEG="az0,az1,..." rotates UE ue_id's cluster
+      // azimuths (AoA/AoD) by the ue_id-th value. Only the UL matters for MU separation and
+      // the UL conv runs in the UE client, so apply on ROLE_CLIENT (per-UE seeded above).
+      if (vrtsim_state->role == ROLE_CLIENT && vrtsim_state->channel_desc != NULL
+          && vrtsim_state->channel_desc->cdl_state != NULL) {
+        const char *azl = getenv("VRTSIM_CDL_UE_AZ_DEG");
+        if (azl && azl[0]) {
+          char buf[256];
+          strncpy(buf, azl, sizeof(buf) - 1);
+          buf[sizeof(buf) - 1] = '\0';
+          int idx = 0;
+          double az = 0.0;
+          for (char *tok = strtok(buf, ","); tok; tok = strtok(NULL, ","), idx++)
+            if (idx == vrtsim_state->ue_id) {
+              az = atof(tok);
+              break;
+            }
+          cdl_reinit_azimuth(vrtsim_state->channel_desc, az);
+          LOG_A(HW, "VRTSIM: UE %d CDL azimuth rotation %.1f deg\n", vrtsim_state->ue_id, az);
+        }
+      }
       // Multi-UE fix (2026-07-06): the per-UE descriptor array was only populated in the
       // CIRDB branch; the modellist path left it NULL -> every DL actor bailed with
       // "channel_desc is NULL" -> no DL written -> no UE could sync (June's chanmod-multi-UE

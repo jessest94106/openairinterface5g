@@ -353,6 +353,107 @@ static struct complexd R_sqrt_22_EPA_medium[16] = {{0.8375,0.0}, {0.5249,0.0}, {
 
 //Rayleigh1_orth_eff_ch_TM4
 
+#include "cdl_model.h"
+
+/* wrapper matching cdl_init's RNG callback signature */
+static double cdl_urand(void) { return uniformrandom(); }
+
+/* TR 38.901 CDL-A/B/C (cdl_idx 0/1/2): cluster delays/powers from cdl_model.h tables,
+ * spatial structure generated per-ray in random_channel(). Mirrors tdlModel for the
+ * delay/power bookkeeping so all downstream consumers (sparse/dense conv) work unchanged. */
+void cdlModel(int cdl_idx, double DS, channel_desc_t *chan_desc) {
+  const cdl_table_t *t = cdl_get_table(cdl_idx);
+  int nb_rx = chan_desc->nb_rx;
+  int nb_tx = chan_desc->nb_tx;
+  /* Power-ranked cluster cap: the vrtsim sparse-conv real-time budget at 122.88 Msps x 8
+   * antennas is tuned for the 12-tap TS 38.104 TDL tables; the full 23-24 clusters
+   * overrun it (actors fall behind -> late ring writes silently dropped -> per-launch
+   * "dead antennas"). Default 12 keeps >98% of profile energy; OAI_CDL_MAX_CLUSTERS=24
+   * restores full fidelity for slower configs. */
+  const char *mc = getenv("OAI_CDL_MAX_CLUSTERS");
+  int max_clusters = (mc && mc[0]) ? atoi(mc) : 12;
+  int keep_idx[CDL_MAX_CLUSTERS];
+  int keep_n = cdl_select_clusters(cdl_idx, max_clusters, keep_idx);
+  chan_desc->nb_taps = keep_n;
+  double max_delay = 0;
+  for (int i = 0; i < keep_n; i++)
+    if (t->delays[keep_idx[i]] > max_delay)
+      max_delay = t->delays[keep_idx[i]]; /* CDL delay tables are NOT sorted (unlike TDL) */
+  chan_desc->Td = max_delay * DS;
+  chan_desc->channel_length =
+      (int)(2 * chan_desc->sampling_rate * chan_desc->Td + 1 + 2 / (M_PI * M_PI) * log(4 * M_PI * chan_desc->sampling_rate * chan_desc->Td));
+  printf("CDL-%c: %f Ms/s, %d/%d clusters kept, Td %e, channel_length %d\n",
+         'A' + cdl_idx, chan_desc->sampling_rate, keep_n, t->n_clusters, chan_desc->Td, chan_desc->channel_length);
+  double sum_amps = 0;
+  chan_desc->amps = calloc(chan_desc->nb_taps, sizeof(double));
+  chan_desc->delays = calloc(chan_desc->nb_taps, sizeof(double));
+  for (int i = 0; i < keep_n; i++) {
+    chan_desc->amps[i] = pow(10, .1 * t->powers_db[keep_idx[i]]);
+    sum_amps += chan_desc->amps[i];
+  }
+  /* Re-normalize the kept subset's delays to unit RMS DS (per TR 38.901 eq. 7.7-1 the
+   * table delays are "normalized delay x desired DS") — pruning weak LATE clusters
+   * otherwise shrinks the effective DS to 0.34-0.64x nominal and CHAN_DS_US would lie. */
+  double dmean = 0, dm2 = 0;
+  for (int i = 0; i < keep_n; i++) {
+    double p = chan_desc->amps[i] / sum_amps;
+    dmean += p * t->delays[keep_idx[i]];
+    dm2 += p * t->delays[keep_idx[i]] * t->delays[keep_idx[i]];
+  }
+  double ds_norm = sqrt(dm2 - dmean * dmean);
+  if (ds_norm < 1e-9)
+    ds_norm = 1.0;
+  for (int i = 0; i < keep_n; i++) {
+    chan_desc->amps[i] /= sum_amps;
+    chan_desc->delays[i] = t->delays[keep_idx[i]] / ds_norm * DS;
+  }
+  chan_desc->Td = chan_desc->Td / ds_norm;
+  chan_desc->channel_length =
+      (int)(2 * chan_desc->sampling_rate * chan_desc->Td + 1 + 2 / (M_PI * M_PI) * log(4 * M_PI * chan_desc->sampling_rate * chan_desc->Td));
+  chan_desc->aoa = 0;
+  chan_desc->random_aoa = 0;
+  chan_desc->ricean_factor = 1.0;
+  chan_desc->ch = calloc(nb_tx * nb_rx, sizeof(struct complexd *));
+  chan_desc->chF = calloc(nb_tx * nb_rx, sizeof(struct complexd *));
+  chan_desc->a = calloc(chan_desc->nb_taps, sizeof(struct complexd *));
+  for (int i = 0; i < nb_tx * nb_rx; i++)
+    chan_desc->ch[i] = calloc(chan_desc->channel_length, sizeof(struct complexd));
+  for (int i = 0; i < nb_tx * nb_rx; i++)
+    chan_desc->chF[i] = calloc(2 + (275 * 12), sizeof(struct complexd));
+  for (int i = 0; i < chan_desc->nb_taps; i++)
+    chan_desc->a[i] = calloc(nb_tx * nb_rx, sizeof(struct complexd));
+  /* identity R_sqrt so generic consumers (e.g. normalization MC) stay valid; the CDL
+   * branch in random_channel() does not use it (spatial correlation comes from geometry) */
+  int matrix_size = nb_tx * nb_rx;
+  chan_desc->R_sqrt = calloc(matrix_size, sizeof(*chan_desc->R_sqrt));
+  for (int row = 0; row < matrix_size; row++) {
+    chan_desc->R_sqrt[row] = calloc(matrix_size, sizeof(**chan_desc->R_sqrt));
+    chan_desc->R_sqrt[row][row].r = 1.0;
+  }
+  /* ULA element spacing in wavelengths; defaults to the standard half-wavelength */
+  const char *rxs = getenv("OAI_CDL_RX_SPACING");
+  const char *txs = getenv("OAI_CDL_TX_SPACING");
+  double rx_sp = (rxs && rxs[0]) ? atof(rxs) : 0.5;
+  double tx_sp = (txs && txs[0]) ? atof(txs) : 0.5;
+  cdl_state_t *st = malloc(sizeof(cdl_state_t));
+  cdl_init(st, cdl_idx, nb_rx, nb_tx, rx_sp, tx_sp, 0.0, keep_idx, keep_n, cdl_urand);
+  chan_desc->cdl_state = st;
+  LOG_I(OCM, "CDL-%c init: %d/%d clusters x %d rays, rx_spacing %.2f lambda, tx_spacing %.2f lambda\n",
+        'A' + cdl_idx, keep_n, t->n_clusters, CDL_NUM_RAYS, rx_sp, tx_sp);
+}
+
+void cdl_reinit_azimuth(channel_desc_t *desc, double az_deg) {
+  cdl_state_t *st = (cdl_state_t *)desc->cdl_state;
+  if (st == NULL)
+    return;
+  int keep_idx[CDL_MAX_CLUSTERS];
+  int keep_n = cdl_select_clusters(st->model, st->n_clusters, keep_idx); /* deterministic: same subset as cdlModel */
+  cdl_init(st, st->model, st->nb_rx, st->nb_tx, st->rx_spacing_lambda, st->tx_spacing_lambda, az_deg, keep_idx, keep_n, cdl_urand);
+  desc->first_run = 1;
+  random_channel(desc, 0);
+  LOG_I(OCM, "CDL: re-drawn with azimuth rotation %.1f deg (%d clusters)\n", az_deg, keep_n);
+}
+
 void tdlModel(int  tdl_paths, double *tdl_delays, double *tdl_amps_dB, double DS_TDL, channel_desc_t *chan_desc ) {
   int nb_rx=chan_desc-> nb_rx;
   int nb_tx=chan_desc-> nb_tx;
@@ -497,6 +598,10 @@ void get_cexp_doppler(struct complexd *cexp_doppler, channel_desc_t *chan_desc, 
 
 double get_normalization_ch_factor(channel_desc_t *desc)
 {
+  // CDL is intentionally excluded: its ray-sum taps are unit-power by construction
+  // (sum of normalized cluster powers = 1), so the factor is exactly 1.0. Running the
+  // MC here would also hit the legacy non-TDL R_sqrt indexing (R_sqrt[i/3][0]), which
+  // zeroes most taps for an identity matrix and returns a wildly wrong factor.
   if (!(desc->channel_length > 1 && desc->modelid >= TDL_A && desc->modelid <= TDL_E)) {
     return 1.0;
   }
@@ -780,6 +885,19 @@ channel_desc_t *new_channel_desc_scm(uint8_t nb_tx,
       chan_desc->ricean_factor  = TDL_E_RICEAN_FACTOR;
       tdl_m(e);
       tdlModel(tdl_paths,  tdl_delays, tdl_amps_dB,  DS_TDL, chan_desc);
+      break;
+
+      /* clustered delay line (CDL) channel model from TR 38.901 Section 7.7.1 */
+    case CDL_A:
+      cdlModel(0, DS_TDL, chan_desc);
+      break;
+
+    case CDL_B:
+      cdlModel(1, DS_TDL, chan_desc);
+      break;
+
+    case CDL_C:
+      cdlModel(2, DS_TDL, chan_desc);
       break;
 
     case EPA:
@@ -1743,6 +1861,7 @@ void free_channel_desc_scm(channel_desc_t *ch) {
   free(ch->chF);
   free(ch->a);
   free(ch->model_name);
+  free(ch->cdl_state);
   free(ch);
 }
 
@@ -1792,6 +1911,44 @@ int random_channel(channel_desc_t *desc, uint8_t abstraction_flag) {
     desc->first_run = 0;
     return 0;
   }
+  // TR 38.901 CDL: deterministic ray sum given the frozen per-(cluster,ray) phases in
+  // cdl_state (drawn once at init/reinit, per-UE seeded). Spatial correlation comes from
+  // the ULA geometry, so no R_sqrt and no AR(1) blending; repeated calls are idempotent.
+  if (desc->modelid >= CDL_A && desc->modelid <= CDL_C && desc->cdl_state != NULL) {
+    const cdl_state_t *cst = (const cdl_state_t *)desc->cdl_state;
+    for (i = 0; i < (int)desc->nb_taps; i++) {
+      for (aarx = 0; aarx < desc->nb_rx; aarx++) {
+        for (aatx = 0; aatx < desc->nb_tx; aatx++) {
+          double h[2];
+          cdl_gen_tap(cst, i, aarx, aatx, desc->amps[i], h);
+          desc->a[i][aarx + (aatx * desc->nb_rx)].r = h[0] * desc->normalization_ch_factor;
+          desc->a[i][aarx + (aatx * desc->nb_rx)].i = h[1] * desc->normalization_ch_factor;
+        }
+      }
+    }
+    desc->first_run = 0;
+    // One-shot ground truth: per-antenna wideband power of the generated taps. A healthy
+    // CDL draw is flat within ~+/-3 dB across antennas; deep per-antenna nulls here mean
+    // the generator/RNG, flat here but dead at the receiver means the conv/write path.
+    static int cdl_dbg = 0;
+    if (cdl_dbg++ < 2) {
+      char pbuf[256];
+      int n = 0;
+      for (aarx = 0; aarx < desc->nb_rx && n < (int)sizeof(pbuf) - 12; aarx++) {
+        double p = 0;
+        for (i = 0; i < (int)desc->nb_taps; i++) {
+          const struct complexd *v = &desc->a[i][aarx];
+          p += v->r * v->r + v->i * v->i;
+        }
+        n += snprintf(pbuf + n, sizeof(pbuf) - n, "%s%.1f", aarx ? " " : "", 10 * log10(p > 1e-30 ? p : 1e-30));
+      }
+      printf("CDL taps per-ant wideband power dB (model=%d nb_rx=%d nb_tx=%d, norm=%.3f, rng probe %.4f %.4f): [%s]\n",
+             desc->modelid, desc->nb_rx, desc->nb_tx, desc->normalization_ch_factor, uniformrandom(), uniformrandom(), pbuf);
+    }
+    stop_meas(&desc->random_channel);
+    return 0;
+  }
+
   bzero(acorr,desc->nb_tx*desc->nb_rx*sizeof(struct complexd));
 
   for (i=0; i<(int)desc->nb_taps; i++) {
