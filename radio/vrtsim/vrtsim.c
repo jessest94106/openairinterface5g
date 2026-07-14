@@ -162,7 +162,8 @@ typedef struct {
                          // The DL write-ahead (tx_sample_advance) was wrongly reused for the UL read, shifting the
                          // server's UL read ~1 slot off the UE's write -> PRACH/PUSCH read as zeros (massive-MIMO 4RX).
   int rx_target_snr_db;  // UL time-domain RX SNR target in dB (per-slot AGC); VRTSIM_RX_SNR_DISABLED = off
-  double agc_psig_ewma[32]; // per-antenna smoothed signal power for the AGC noise scaling (0 = uninit)
+  double agc_psig_ewma[32]; // per-antenna full-batch mean signal power for the AGC noise scaling (0 = uninit)
+  double agc_psig_peak[32]; // per-antenna running max batch power — used only to gate the EWMA to full batches
   int ul_noise_std;      // per-antenna INDEPENDENT UL noise stddev (int16 units), env VRTSIM_UL_NOISE_STD. 0=off.
                          // Raises the gNB PRACH I0 (no-chanmod passthrough has none -> saturated 48 dB detection).
                          // Independent per RX antenna so the 4-RX coherent combine yields real array gain
@@ -1201,19 +1202,25 @@ static void perform_channel_modelling(void *arg)
         psig += (double)samples[i].r * samples[i].r + (double)samples[i].i * samples[i].i;
       psig /= (num_samples > 0 ? num_samples : 1);
       if (psig > 1.0) {
-        // Scale noise from the PEAK (full-occupancy) signal power, not the instantaneous
-        // batch power. Physics: thermal noise power is constant; the SNR target is defined
-        // against the full signal. Instantaneous scaling under-noised partially-filled
-        // batches -> delivered SNR sat ABOVE target by a per-launch-random margin
-        // (batch/slot alignment) -> 3x run-to-run throughput spread at identical config.
-        // (An EWMA is wrong the other way: it drags full-batch power onto genuinely weak
-        // edge batches and drowns symbol edges -> ~20% BLER floor at ANY target.)
-        // Peak-hold is launch-invariant and exact on full batches; single writer per
-        // antenna (one chanmod actor), no locking needed.
-        double *pk = &vrtsim_state->agc_psig_ewma[aarx & 31];
+        // Noise must be STATIONARY (constant power), scaled to the MEAN full-occupancy
+        // signal power. Three falsified alternatives, kept for the record:
+        //  - instantaneous per-batch psig: partial batches under-noised -> delivered SNR
+        //    above target by a per-launch-random margin -> 3x run spread (dilution lottery)
+        //  - plain EWMA of all batches: mixes edge batches in, drowns symbol edges
+        //    -> ~20% BLER floor at any target
+        //  - peak-hold: ratchets on OFDM PAPR (max batch ~5-6 dB over mean) -> delivered
+        //    SNR degrades through the run (280 -> 43 Mbps across a 30 dB N=4 series)
+        // So: peak only CLASSIFIES batches (full vs edge); the sigma source is an EWMA
+        // restricted to full batches (psig >= peak/4), immune to PAPR and to ratchet.
+        // Single writer per antenna (one chanmod actor), no locking needed.
+        double *pk = &vrtsim_state->agc_psig_peak[aarx & 31];
+        double *ew = &vrtsim_state->agc_psig_ewma[aarx & 31];
         if (psig > *pk)
           *pk = psig;
-        const double pnoise = *pk / pow(10.0, vrtsim_state->rx_target_snr_db / 10.0);
+        if (psig >= 0.25 * *pk)
+          *ew = (*ew <= 0.0) ? psig : (0.98 * *ew + 0.02 * psig);
+        const double pref = (*ew > 0.0) ? *ew : psig;
+        const double pnoise = pref / pow(10.0, vrtsim_state->rx_target_snr_db / 10.0);
         const double sigma = sqrt(pnoise / 2.0);  // per-component (I,Q) std
         for (int i = 0; i < num_samples; i++) {
           samples[i].r += (float)(sigma * noisebuf[2 * i]);
