@@ -162,6 +162,7 @@ typedef struct {
                          // The DL write-ahead (tx_sample_advance) was wrongly reused for the UL read, shifting the
                          // server's UL read ~1 slot off the UE's write -> PRACH/PUSCH read as zeros (massive-MIMO 4RX).
   int rx_target_snr_db;  // UL time-domain RX SNR target in dB (per-slot AGC); VRTSIM_RX_SNR_DISABLED = off
+  double agc_psig_ewma[32]; // per-antenna smoothed signal power for the AGC noise scaling (0 = uninit)
   int ul_noise_std;      // per-antenna INDEPENDENT UL noise stddev (int16 units), env VRTSIM_UL_NOISE_STD. 0=off.
                          // Raises the gNB PRACH I0 (no-chanmod passthrough has none -> saturated 48 dB detection).
                          // Independent per RX antenna so the 4-RX coherent combine yields real array gain
@@ -1200,7 +1201,15 @@ static void perform_channel_modelling(void *arg)
         psig += (double)samples[i].r * samples[i].r + (double)samples[i].i * samples[i].i;
       psig /= (num_samples > 0 ? num_samples : 1);
       if (psig > 1.0) {
-        const double pnoise = psig / pow(10.0, vrtsim_state->rx_target_snr_db / 10.0);
+        // Scale noise from an EWMA of the signal power, NOT the instantaneous batch power:
+        // per-batch sigma makes the injected noise non-stationary WITHIN a TB (variance jumps
+        // at batch boundaries, and partially-filled batches under-estimate psig) — the decoder
+        // assumes stationary noise, so this cost a BLER floor that scaled with the injected
+        // noise level (~20%@0dB / ~14%@10 / ~5%@20, per-launch variance from batch alignment).
+        // Single writer per antenna (one chanmod actor), so no locking needed.
+        double *ew = &vrtsim_state->agc_psig_ewma[aarx & 31];
+        *ew = (*ew <= 0.0) ? psig : (0.95 * *ew + 0.05 * psig);
+        const double pnoise = *ew / pow(10.0, vrtsim_state->rx_target_snr_db / 10.0);
         const double sigma = sqrt(pnoise / 2.0);  // per-component (I,Q) std
         for (int i = 0; i < num_samples; i++) {
           samples[i].r += (float)(sigma * noisebuf[2 * i]);
