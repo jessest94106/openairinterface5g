@@ -1201,15 +1201,19 @@ static void perform_channel_modelling(void *arg)
         psig += (double)samples[i].r * samples[i].r + (double)samples[i].i * samples[i].i;
       psig /= (num_samples > 0 ? num_samples : 1);
       if (psig > 1.0) {
-        // Scale noise from an EWMA of the signal power, NOT the instantaneous batch power:
-        // per-batch sigma makes the injected noise non-stationary WITHIN a TB (variance jumps
-        // at batch boundaries, and partially-filled batches under-estimate psig) — the decoder
-        // assumes stationary noise, so this cost a BLER floor that scaled with the injected
-        // noise level (~20%@0dB / ~14%@10 / ~5%@20, per-launch variance from batch alignment).
-        // Single writer per antenna (one chanmod actor), so no locking needed.
-        double *ew = &vrtsim_state->agc_psig_ewma[aarx & 31];
-        *ew = (*ew <= 0.0) ? psig : (0.95 * *ew + 0.05 * psig);
-        const double pnoise = *ew / pow(10.0, vrtsim_state->rx_target_snr_db / 10.0);
+        // Scale noise from the PEAK (full-occupancy) signal power, not the instantaneous
+        // batch power. Physics: thermal noise power is constant; the SNR target is defined
+        // against the full signal. Instantaneous scaling under-noised partially-filled
+        // batches -> delivered SNR sat ABOVE target by a per-launch-random margin
+        // (batch/slot alignment) -> 3x run-to-run throughput spread at identical config.
+        // (An EWMA is wrong the other way: it drags full-batch power onto genuinely weak
+        // edge batches and drowns symbol edges -> ~20% BLER floor at ANY target.)
+        // Peak-hold is launch-invariant and exact on full batches; single writer per
+        // antenna (one chanmod actor), no locking needed.
+        double *pk = &vrtsim_state->agc_psig_ewma[aarx & 31];
+        if (psig > *pk)
+          *pk = psig;
+        const double pnoise = *pk / pow(10.0, vrtsim_state->rx_target_snr_db / 10.0);
         const double sigma = sqrt(pnoise / 2.0);  // per-component (I,Q) std
         for (int i = 0; i < num_samples; i++) {
           samples[i].r += (float)(sigma * noisebuf[2 * i]);
