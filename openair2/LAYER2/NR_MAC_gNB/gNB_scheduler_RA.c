@@ -1088,7 +1088,14 @@ static bool nr_get_Msg3alloc(gNB_MAC_INST *mac, int CC_id, int current_slot, fra
   NR_RA_t *ra = UE->ra;
   DevAssert(ra->Msg3_tda_id >= 0 && ra->Msg3_tda_id < 16);
 
+  /* Msg3 carries 6-8 bytes, yet upstream sizes it from min_grant_prb (a *data*-grant floor).
+   * Measured here at 273-PRB initial BWP: full-band msg3 works, partial-band msg3 (24 or 240
+   * PRB) yields "MSG3 ULSCH with no signal" -> RA fails at WAIT_Msg3, i.e. the UE resolves the
+   * RAR grant elsewhere (suspect: truncated-RIV handling for BWP > 180 PRB, 38.213 8.3).
+   * OAI_MSG3_PRB pins the msg3 width independently of min_grant_prb so the data-grant floor
+   * can be lowered (partial-band slots) without touching random access. */
   uint16_t msg3_nb_rb = max(8, mac->min_grant_prb); // sdu has 6 or 8 bytes
+  { const char *e = getenv("OAI_MSG3_PRB"); if (e && e[0]) msg3_nb_rb = max(8, atoi(e)); }
 
   NR_UE_UL_BWP_t *ul_bwp = &UE->current_UL_BWP;
   NR_UE_ServingCell_Info_t *sc_info = &UE->sc_info;

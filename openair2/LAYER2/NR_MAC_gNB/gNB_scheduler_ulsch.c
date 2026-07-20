@@ -2275,6 +2275,19 @@ static int  pf_ul(gNB_MAC_INST *nrmac,
     while (rbStart + available_rb < bi.bwpSize && !(rballoc_mask[rbStart + bi.bwpStart + available_rb] & slbitmap) && available_rb < max_rbSize)
       available_rb++;
 
+    /* MU pair allocation: the first co-scheduled UE of a slot defines the grant template
+     * (rbStart,rbSize); partners reuse it verbatim so both land on exactly the same PRBs
+     * whatever the band size. Without this, each UE searches/sizes independently and they
+     * drift into disjoint sub-bands as soon as the grant is not full-band — which is what
+     * kept partial-band slots (PRACH slot: 261 of 273 free) unusable for MU. */
+    static int mu_tmpl_f = -1, mu_tmpl_s = -1, mu_tmpl_start = 0, mu_tmpl_size = 0;
+    const bool mu_pair_alloc = mu_regime && iterator->UE->ra == NULL;
+    const bool mu_tmpl_hit = mu_pair_alloc && mu_tmpl_f == sched_frame && mu_tmpl_s == sched_slot && mu_tmpl_size > 0;
+    if (mu_tmpl_hit) {
+      rbStart = mu_tmpl_start;
+      available_rb = mu_tmpl_size;
+    }
+
     if (rbStart + min_rb > bi.bwpSize || available_rb < min_rb) {
       reset_beam_status(&nrmac->beam_info, frame, slot, iterator->UE->UE_beam_index, slots_per_frame, dci_beam.new_beam);
       reset_beam_status(&nrmac->beam_info, sched_frame, sched_slot, iterator->UE->UE_beam_index, slots_per_frame, beam.new_beam);
@@ -2353,6 +2366,26 @@ static int  pf_ul(gNB_MAC_INST *nrmac,
                                      0,
                                      sched.nrOfLayers)
                       >> 3;
+    }
+
+    /* pair allocation, second half: partner takes the template size verbatim (TBS recomputed
+     * for its own MCS); the first co-scheduled UE of the slot publishes the template. */
+    if (mu_tmpl_hit && sched.rbSize != mu_tmpl_size) {
+      sched.rbSize = mu_tmpl_size;
+      sched.tb_size = nr_compute_tbs(sched.Qm,
+                                     sched.R,
+                                     sched.rbSize,
+                                     sched.tda_info.nrOfSymbols,
+                                     sched.dmrs_info.N_PRB_DMRS * sched.dmrs_info.num_dmrs_symb,
+                                     0,
+                                     0,
+                                     sched.nrOfLayers)
+                      >> 3;
+    } else if (mu_pair_alloc) {
+      mu_tmpl_f = sched_frame;
+      mu_tmpl_s = sched_slot;
+      mu_tmpl_start = rbStart;
+      mu_tmpl_size = sched.rbSize;
     }
 
     // Calacualte the normalized tx_power for PHR
@@ -2929,6 +2962,8 @@ static void nr_ulsch_preprocessor(gNB_MAC_INST *nr_mac, post_process_pusch_t *pp
     int beam = 0;
     const NR_tda_info_t *tda_info = NULL;
     int n_tda = get_num_ul_tda(nr_mac, next->s, k2, &tda_info);
+    { static int s19a = 0; if (next->s == 19 && s19a++ < 40)
+        printf("[S19] walk from %d.%d k2 %d n_tda %d max_dci %d\n", frame, slot, k2, n_tda, max_dci); }
     if (n_tda == 0) /* no TDA fulfills this */
       break;
     int rb_start = 0;
@@ -2947,6 +2982,9 @@ static void nr_ulsch_preprocessor(gNB_MAC_INST *nr_mac, post_process_pusch_t *pp
     }
     /* proportional fair scheduling algorithm */
     int sched = pf_ul(nr_mac, pp_pusch, tda, tda_info, nr_mac->UE_info.connected_ue_list, max_dci, num_beams, start, len);
+    { static int s19b = 0; if (next->s == 19 && s19b++ < 40)
+        printf("[S19] pf_ul slot19 tda %d sym %d+%d rbstart %d rblen %d -> sched %d\n",
+               tda, tda_info->startSymbolIndex, tda_info->nrOfSymbols, start[0], len[0], sched); }
     LOG_D(NR_MAC, "run pf_ul() at %4d.%2d with tda %d k2 %d (ULSCH at %4d.%2d) scheduled %d last_dl %d\n", frame, slot, tda, k2, next->f, next->s, sched, last_dl);
     /* if we did not schedule anything, and it's not the last slot, break. In
      * the case we did schedule or it's the last slot (see above!), continue
