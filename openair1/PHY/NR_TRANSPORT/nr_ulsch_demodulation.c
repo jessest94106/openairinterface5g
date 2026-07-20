@@ -960,7 +960,7 @@ static void inner_rx(PHY_VARS_gNB *gNB,
   // llr[0] on data symbols. DMRS symbols fall through to the normal path. Off => unchanged.
   {
     static int mu_irc = -1;
-    if (mu_irc < 0) { const char *e = getenv("OAI_UL_MU_IRC"); mu_irc = (e && e[0]) ? 1 : 0; }
+    if (mu_irc < 0) { const char *e = getenv("OAI_UL_MU_IRC"); mu_irc = (e && e[0]) ? atoi(e) : 0; }
     // MU regime gate (set by the MAC scheduler): only true when >=2 UEs are fully connected and
     // nobody is in RA. Without this, full-band Msg3 (rb 0+273) passes the rb_size filter below and
     // IRC corrupts RA -> endless PRACH-retry storm. This is the scheduler->PHY co-sched marker.
@@ -1011,6 +1011,14 @@ static void inner_rx(PHY_VARS_gNB *gNB,
       for (int a = 0; a < nb_rx_ant; a++)
         for (int i = 0; i < 32 && i < buffer_length; i++) rxe += abs(rxFext[a][i].r) + abs(rxFext[a][i].i);
       if (rxe < 8) { partner = -1; mu_c_rxe++; } // no real signal this symbol -> fall through
+    }
+    // Freshness gate: a stale partner estimate (previous slot's chest, full-strength) passes any
+    // ENERGY check and the 2-layer MMSE then crushes the self stream (the per-UE all-round HARQ
+    // chain state). Only use the partner if its hoisted chest is stamped with THIS frame/slot.
+    if (partner >= 0
+        && !(gNB->pusch_vars[partner].mu_chest_frame == (int)frame && gNB->pusch_vars[partner].mu_chest_slot == slot)) {
+      partner = -1;
+      mu_c_parte++;
     }
     if (partner >= 0) {
       NR_gNB_PUSCH *pv_p = &gNB->pusch_vars[partner];
@@ -1075,9 +1083,17 @@ static void inner_rx(PHY_VARS_gNB *gNB,
       // symbol (stale pusch_pdu => |chPart|~0), the 2-layer MMSE degenerates and zeroes even the
       // self stream (outAbsMean=0, llr=0 observed). Fall through to normal MRC rather than destroy
       // the self decode. IRC only runs on genuinely-live co-scheduled pairs.
-      long partE = 0;
+      long partE = 0, selfE = 0;
       for (int a = 0; a < nb_rx_ant; a++)
-        for (int i = 0; i < 32 && i < buffer_length; i++) partE += abs(chF2[1][a][i].r) + abs(chF2[1][a][i].i);
+        for (int i = 0; i < 32 && i < buffer_length; i++) {
+          partE += abs(chF2[1][a][i].r) + abs(chF2[1][a][i].i);
+          selfE += abs(chF2[0][a][i].r) + abs(chF2[0][a][i].i);
+        }
+      // RELATIVE liveness: an absolute partE>=8 lets a noise-phantom partner (|chPart|~46 vs
+      // |chSelf|~1700 observed) into the 2-layer MMSE, which then crushes the SELF stream
+      // (out hot, llr dead, all-round HARQ chains). A real co-scheduled partner at the same AGC
+      // target sits within a few dB of self; require within 15 dB (selfE>>5) else fall to MRC.
+      if (partE < (selfE >> 5)) partE = 0;
       // Near-orthogonal bypass (env OAI_UL_MU_RHO_BYPASS, percent, default 2; 0=off): band-averaged
       // corr2pct between the two UEs' estimates. Near-zero => plain MRC already suppresses the
       // partner (post-MF SIR ~ 1/corr > 17 dB) ABOVE the joint-ML kernels' LLR-fidelity ceiling
@@ -1146,7 +1162,16 @@ static void inner_rx(PHY_VARS_gNB *gNB,
       // psi terms ~3*comp must stay < 32767). Env OAI_UL_MU_SHIFT_ADJ, default 3.
       static int mu_shift_adj = -1;
       if (mu_shift_adj < 0) { const char *e = getenv("OAI_UL_MU_SHIFT_ADJ"); mu_shift_adj = (e && e[0]) ? atoi(e) : 0; }
-      const int mu_shift = (output_shift > mu_shift_adj) ? output_shift - mu_shift_adj : 0;
+      // Qm-aware: the +K bits of compensation gain is calibrated for the QPSK LLR path (which
+      // absorbs 4 bits downstream). Applying it to Qm>=4 saturates the 16/64QAM LLRs (~1300 vs
+      // healthy ~75 = LDPC-fatal) -> every Qm4 TB fails -> OLLA pinned at the Qm2/4 boundary
+      // (the all-round HARQ chain family). Gain only where the downstream path absorbs it.
+      // Qm>=4 got 0 adj above; at MCS 27-28 the failing-TB LLR mean sits ~46 (marginal, vs
+      // saturation ~1300) — OAI_UL_MU_SHIFT_ADJ_HI adds a small measured gain for Qm>=4 only.
+      static int mu_shift_adj_hi = -1;
+      if (mu_shift_adj_hi < 0) { const char *e = getenv("OAI_UL_MU_SHIFT_ADJ_HI"); mu_shift_adj_hi = (e && e[0]) ? atoi(e) : 0; }
+      const int mu_shift_adj_eff = (rel15_ul->qam_mod_order == 2) ? mu_shift_adj : mu_shift_adj_hi;
+      const int mu_shift = (output_shift > mu_shift_adj_eff) ? output_shift - mu_shift_adj_eff : 0;
       nr_ulsch_channel_compensation(buffer_length, nb_rx_ant, rxFext, chF2, mga, mgb, mgc, comp2, 2, rho2, &mu_pdu2, 0, mu_shift);
       const int mu_nre = pusch_vars->ul_valid_re_per_slot[symbol];
       // MMSE-null + standard per-stream LLR for ALL Qm — DEFAULT (OAI_UL_MU_MMSE=0 restores the
@@ -1165,10 +1190,10 @@ static void inner_rx(PHY_VARS_gNB *gNB,
                                 rho2[0][1], rho2[1][0], mu_nre, rel15_ul->qam_mod_order);
         // renormalize: demapper LLRs are ~linear in input scale, so undo the K extra bits to
         // keep the downstream int8 LDPC input in its usual range (internal precision retained)
-        if (mu_shift_adj > 0) {
+        if (mu_shift_adj_eff > 0) {
           int16_t *l0 = llr[0];
           for (int i = 0, nll = mu_nre * rel15_ul->qam_mod_order; i < nll; i++)
-            l0[i] >>= mu_shift_adj;
+            l0[i] >>= mu_shift_adj_eff;
         }
       } else {
         // MMSE-IRC to null the partner, then per-stream LLR of the separated self.
@@ -1250,8 +1275,10 @@ static void inner_rx(PHY_VARS_gNB *gNB,
             }
             if (err > 0 && sig > 0) sinr_db = 10.0 * log10(sig / err);
           }
-          LOG_E(PHY, "[MU METRIC] rnti=%04x port=0x%x rnd=%d partner=%d sym=%d nre=%d rxAbs=%ld rx0=%ld rx1=%ld |chSelf|=%ld |chPart|=%ld corr2pct=%d log2h=%d outAbsMean=%ld llrAbsMean=%ld llrMax=%d postSINR=%.1fdB preSNR=[%.1f %.1f %.1f %.1f]dB cov(irc=%ld nopart=%ld rxe=%ld parte=%ld byp=%ld)\n",
-                rel15_ul->rnti, rel15_ul->dmrs_ports, gNB->ulsch[ulsch_id].harq_process->round, partner, symbol, nre, rxa, rxA[0], rxA[1], ch0, ch1, corr2pct, pusch_vars->log2_maxh,
+          LOG_E(PHY, "[MU METRIC] rnti=%04x port=0x%x rnd=%d partner=%d sym=%d nre=%d Qm=%d oshift=%d mshift=%d rxAbs=%ld rx0=%ld rx1=%ld |chSelf|=%ld |chPart|=%ld corr2pct=%d log2h=%d outAbsMean=%ld llrAbsMean=%ld llrMax=%d postSINR=%.1fdB preSNR=[%.1f %.1f %.1f %.1f]dB cov(irc=%ld nopart=%ld rxe=%ld parte=%ld byp=%ld)\n",
+                rel15_ul->rnti, rel15_ul->dmrs_ports, gNB->ulsch[ulsch_id].harq_process->round, partner, symbol, nre,
+                rel15_ul->qam_mod_order, output_shift, mu_shift,
+                rxa, rxA[0], rxA[1], ch0, ch1, corr2pct, pusch_vars->log2_maxh,
                 nre ? out0 / nre : 0, (nre * rel15_ul->qam_mod_order) ? labs / (nre * rel15_ul->qam_mod_order) : 0, lmax,
                 sinr_db, presnr[0], presnr[1], presnr[2], presnr[3], mu_c_irc, mu_c_nopart, mu_c_rxe, mu_c_parte, mu_c_byp);
         }
@@ -1391,7 +1418,7 @@ static void nr_pusch_symbol_processing(void *arg)
   // set by chest on completion), decoding is doomed (zero channel -> zero LLRs -> certain CRC fail
   // poisoning BLER/MCS). Re-push this task to the pool tail (bounded) so it re-runs microseconds
   // later when chest is done; ans completes on the successful re-run. MU-gated; default unchanged.
-  { static int mu_rq = -1; if (mu_rq < 0) { const char *e = getenv("OAI_UL_MU_IRC"); mu_rq = (e && e[0]) ? 1 : 0; }
+  { static int mu_rq = -1; if (mu_rq < 0) { const char *e = getenv("OAI_UL_MU_IRC"); mu_rq = (e && e[0]) ? atoi(e) : 0; }
     extern volatile int g_mu_mimo_active;
     // OAI_UL_CHEST_GUARD=1: apply the unready-estimate requeue in ALL modes, not only MU. The race
     // is antenna-count driven (chest work scales with nb_rx): at 8 RX the DMRS task may not finish
@@ -1417,9 +1444,19 @@ static void nr_pusch_symbol_processing(void *arg)
       }
       if (unready) {
         rdata->bounces++;
-        task_t t = {.func = &nr_pusch_symbol_processing, .args = rdata};
-        pushTpool(&gNB->threadPool, t);
-        return;
+        if (rdata->bounces < 200) {
+          task_t t = {.func = &nr_pusch_symbol_processing, .args = rdata};
+          pushTpool(&gNB->threadPool, t);
+          return;
+        }
+        // Bounce cap: partner estimate never readied. Proceed WITHOUT it (downstream partE<8
+        // check skips IRC -> plain decode) so an indication is ALWAYS sent -- an unbounded
+        // requeue starves the TB silently and MAC timeout-retransmits (the 8-15% phantom BLER).
+        static int requeue_giveups = 0;
+        if (requeue_giveups < 50 || (requeue_giveups % 500) == 0)
+          printf("[REQUEUE GIVEUP] %d.%d ulsch %d bounces %d total %d\n",
+                 rdata->frame, rdata->slot, ulsch_id, rdata->bounces, requeue_giveups);
+        requeue_giveups++;
       }
     } }
   for (int symbol = rdata->startSymbol; symbol < rdata->startSymbol + rdata->numSymbols; symbol++) {
@@ -1451,6 +1488,14 @@ static void nr_pusch_symbol_processing(void *arg)
              rdata->pusch_ch_est_dmrs_interpl_slot_mem);
 
     int nb_re_pusch = gNB->pusch_vars[ulsch_id].ul_valid_re_per_slot[symbol];
+    // Capture this TB's mid-slot LLR quality so FAILCLASS can report it for TBs that later fail
+    // (the rate-limited MU METRIC misses the failing TBs; this closes that blind spot).
+    if (symbol == 6) {
+      const int nll = nb_re_pusch * rel15_ul->qam_mod_order;
+      long sll = 0;
+      for (int i = 0; i < nll; i++) sll += abs(llrss[0][i]);
+      pusch_vars->last_llr_mean = nll ? (int32_t)(sll / nll) : -1;
+    }
     // layer de-mapping
     int16_t *llr_ptr = llrs[0];
     if (rel15_ul->nrOfLayers != 1) {
@@ -1516,14 +1561,16 @@ int nr_rx_pusch_tp(PHY_VARS_gNB *gNB,
   int nb_rx_ant = frame_parms->nb_antennas_rx;
   int nb_layer = rel15_ul->nrOfLayers;
 
-  // Initialize memory for DMRS signals
-  c16_t pusch_dmrs_slot_mem[nb_layer * buffer_length_slot] __attribute__((aligned(32)));
-  // Initialize memory for channel estimates based on DMRS positions
-  c16_t pusch_ch_est_dmrs_pos_slot_mem[buffer_length_slot * nb_layer * nb_rx_ant] __attribute__((aligned(32)));
-  // memory to store slot grid with channel coefficients based on DMRS positions after interpolation
-  c16_t pusch_ch_est_dmrs_interpl_slot_mem[buffer_length_slot * nb_layer * nb_rx_ant] __attribute__((aligned(32)));
-  // memory to store extracted data including PUSCH + DMRS
-  c16_t rxFext_slot_mem[nb_rx_ant * buffer_length_slot] __attribute__((aligned(32)));
+  // Slot-scratch from pusch_vars (init-time heap): as stack VLAs these exceed the default
+  // 8MB thread stack at 16RX x 273PRB (~8.9MB) and segfault L1_rx_thread in the prologue.
+  // Init sized them for max_ul_mimo_layers(4) x N_RB_UL x nb_antennas_rx.
+  AssertFatal(nb_layer <= 4 && rel15_ul->rb_size <= frame_parms->N_RB_UL,
+              "PUSCH scratch undersized: nb_layer %d rb_size %d N_RB_UL %d\n",
+              nb_layer, rel15_ul->rb_size, frame_parms->N_RB_UL);
+  c16_t *pusch_dmrs_slot_mem = pusch_vars->dmrs_slot_scratch;
+  c16_t *pusch_ch_est_dmrs_pos_slot_mem = pusch_vars->chest_dmrs_pos_scratch;
+  c16_t *pusch_ch_est_dmrs_interpl_slot_mem = pusch_vars->chest_interpl_scratch;
+  c16_t *rxFext_slot_mem = pusch_vars->rxFext_slot_scratch;
 
 #if T_TRACER
   // Initialize memory for DMRS signals
@@ -1647,6 +1694,8 @@ int nr_rx_pusch_tp(PHY_VARS_gNB *gNB,
     pusch_vars->mu_max_ch = max_ch;
     pusch_vars->mu_nvar = nvar;
     pusch_vars->mu_chest_done = 1;
+    pusch_vars->mu_chest_frame = frame;
+    pusch_vars->mu_chest_slot = slot;
     return 0;
   }
 mu_chest_skipped:;

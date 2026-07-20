@@ -113,8 +113,21 @@ static void *sdap_tun_read_thread(void *arg)
   int len;
   reblock_tun_socket(entity->pdusession_sock);
 
+  // Option-3 Stage 0 (UE_UL_FEED_OPTIMIZATION_PLAN.md): feed profiler. OAI_UE_TUN_PROF=1
+  // prints pkts/s, MB/s and the read-wait vs tx_entity time split every ~5 s.
+  static int tun_prof = -1;
+  if (tun_prof < 0) { const char *e = getenv("OAI_UE_TUN_PROF"); tun_prof = (e && e[0]) ? atoi(e) : 0; }
+  uint64_t prof_pkts = 0, prof_bytes = 0, prof_read_ns = 0, prof_tx_ns = 0, prof_last_ns = 0;
+
   while (!entity->stop_thread) {
+    struct timespec t0, t1, t2;
+    if (tun_prof) clock_gettime(CLOCK_MONOTONIC, &t0);
     len = read(entity->pdusession_sock, &rx_buf, NL_MAX_PAYLOAD);
+    if (tun_prof && len > 0) {
+      clock_gettime(CLOCK_MONOTONIC, &t1);
+      prof_read_ns += (uint64_t)(t1.tv_sec - t0.tv_sec) * 1000000000ULL + (t1.tv_nsec - t0.tv_nsec);
+      prof_pkts++; prof_bytes += len;
+    }
     if (len == -1) {
       if (errno == EINTR)
         continue; // interrupted system call
@@ -152,6 +165,22 @@ static void *sdap_tun_read_thread(void *arg)
                       NULL,
                       entity->qfi,
                       dc);
+    if (tun_prof) {
+      clock_gettime(CLOCK_MONOTONIC, &t2);
+      prof_tx_ns += (uint64_t)(t2.tv_sec - t1.tv_sec) * 1000000000ULL + (t2.tv_nsec - t1.tv_nsec);
+      const uint64_t now = (uint64_t)t2.tv_sec * 1000000000ULL + t2.tv_nsec;
+      if (prof_last_ns == 0) prof_last_ns = now;
+      if (now - prof_last_ns >= 5000000000ULL) {
+        const double s = (now - prof_last_ns) / 1e9;
+        printf("[TUNPROF] ue %ld pkts/s %.0f MB/s %.2f read-wait %.1f%% tx_entity %.1f%% (avg tx %.1f us/pkt)\n",
+               (long)entity->ue_id, prof_pkts / s, prof_bytes / 1e6 / s,
+               100.0 * prof_read_ns / (now - prof_last_ns),
+               100.0 * prof_tx_ns / (now - prof_last_ns),
+               prof_pkts ? prof_tx_ns / 1e3 / prof_pkts : 0.0);
+        prof_pkts = prof_bytes = prof_read_ns = prof_tx_ns = 0;
+        prof_last_ns = now;
+      }
+    }
   }
 
   return NULL;

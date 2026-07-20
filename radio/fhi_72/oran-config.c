@@ -611,8 +611,8 @@ static bool set_fh_eaxcid_conf(struct xran_eaxcid_config *eaxcid_conf, enum xran
     case XRAN_CATEGORY_A:
       eaxcid_conf->mask_cuPortId = 0xf000;
       eaxcid_conf->mask_bandSectorId = 0x0f00;
-      eaxcid_conf->mask_ccId = 0x00f0;
-      eaxcid_conf->mask_ruPortId = 0x000f;
+      eaxcid_conf->mask_ccId = 0x00e0;
+      eaxcid_conf->mask_ruPortId = 0x001f;
       eaxcid_conf->bit_cuPortId = 0;
       eaxcid_conf->bit_bandSectorId = 0; // total number of band sectors supported by O-RU should be retrieved by M-plane - <max-num-bands> && <max-num-sectors>
       eaxcid_conf->bit_ccId = 0; // total number of CC supported by O-RU should be retrieved by M-plane - <max-num-component-carriers>

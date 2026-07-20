@@ -191,7 +191,7 @@ typedef struct {
  task_ans_t *ans;
 } feptx_cmd_t;
 
-#define RU_RX_SLOT_DEPTH 4
+#define RU_RX_SLOT_DEPTH 8
 typedef struct RU_proc_t_s {
   /// Pointer to associated RU descriptor
   struct RU_t_s *ru;

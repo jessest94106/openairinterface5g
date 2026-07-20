@@ -187,6 +187,22 @@ typedef struct {
   double ul_mu_ds_gain;                                // 2nd-tap linear gain (parsed from dB)
   double ul_mu_ds_angoff;                              // 2nd-tap extra steering angle (cycles/antenna)
   c16_t ul_mu_w2[MAX_NUM_UES][MAX_NUM_ANTENNAS_TX];    // per-(UE,antenna) Q15 weight of the delayed tap
+  // HW-impairment injection (HW_IMPAIRMENT_INJECTION_SCOPE.md). Phase 1: per-UE residual CFO.
+  double imp_cfo_hz[MAX_NUM_UES];                      // VRTSIM_IMP_CFO_HZ="f0,f1,..." (Hz; 0 = off)
+  double imp_cfo_cos[MAX_NUM_UES], imp_cfo_sin[MAX_NUM_UES]; // per-sample phasor step
+  double imp_cfo_pr[MAX_NUM_UES], imp_cfo_pi[MAX_NUM_UES];   // running phasor (renormed)
+  int imp_after_attach;                                // gate on steering trigger (default 1)
+  int imp_any;
+  // Phase 2: gNB RX IQ imbalance y = a*x + b*conj(x), static per run (common across antennas).
+  int imp_iq_on;
+  c16_t imp_iq_a, imp_iq_b;                            // Q15
+  // Phase 3: gNB RX phase noise — Wiener walk, batch-granular (CPE-dominant approximation).
+  double imp_pn_lw_hz;                                 // VRTSIM_IMP_PN_HZ (3dB linewidth; 0=off)
+  double imp_pn_phase;                                 // running phase (common LO)
+  uint64_t imp_rng;                                    // seeded xorshift64
+  // Phase 4: UE PA nonlinearity — limiter (Rapp p->inf), sat at IBO dB above running RMS.
+  double imp_pa_ibo_db;                                // VRTSIM_IMP_PA_IBO_DB (0=off)
+  double imp_pa_pow_ewma[MAX_NUM_UES];                 // per-UE |x|^2 EWMA
   double doppler_hz;                                   // 3GPP fading rate (sim-time Hz); 0 = static taps
   double ue_speed_kmh;                                 // UE mobility; converted to doppler_hz at fc on first write
   openair0_timestamp_t last_chan_update;               // last tap-evolution timestamp (samples)
@@ -433,6 +449,67 @@ static void vrtsim_readconfig(vrtsim_state_t *vrtsim_state)
     LOG_A(HW, "VRTSIM: UL MU time-varying channel f=%.3f Hz amp=%.3f cyc/ant\n",
           vrtsim_state->ul_mu_tv_freq, vrtsim_state->ul_mu_tv_amp);
   }
+  // HW impairments Phase 1 — per-UE residual CFO: VRTSIM_IMP_CFO_HZ="f0,f1,..." (Hz).
+  // Applied pre-merge per UE via per-sample phasor recursion. VRTSIM_IMP_AFTER_ATTACH=1
+  // (default) gates on the steering trigger so attach runs clean.
+  vrtsim_state->imp_any = 0;
+  vrtsim_state->imp_after_attach = 1;
+  { const char *e = getenv("VRTSIM_IMP_AFTER_ATTACH"); if (e && e[0]) vrtsim_state->imp_after_attach = atoi(e); }
+  for (int u = 0; u < MAX_NUM_UES; u++) {
+    vrtsim_state->imp_cfo_hz[u] = 0.0;
+    vrtsim_state->imp_cfo_pr[u] = 1.0;
+    vrtsim_state->imp_cfo_pi[u] = 0.0;
+    vrtsim_state->imp_cfo_cos[u] = 1.0;
+    vrtsim_state->imp_cfo_sin[u] = 0.0;
+  }
+  { const char *e = getenv("VRTSIM_IMP_CFO_HZ");
+    if (e && e[0]) {
+      char buf[256]; strncpy(buf, e, sizeof(buf) - 1); buf[sizeof(buf) - 1] = '\0';
+      int u = 0;
+      for (char *tok = strtok(buf, ","); tok && u < MAX_NUM_UES; tok = strtok(NULL, ","), u++) {
+        vrtsim_state->imp_cfo_hz[u] = atof(tok);
+        if (vrtsim_state->imp_cfo_hz[u] != 0.0) vrtsim_state->imp_any = 1;
+      }
+      LOG_A(HW, "VRTSIM: impairment CFO enabled (%s Hz), after_attach=%d\n", e, vrtsim_state->imp_after_attach);
+    } }
+  // IQ imbalance: VRTSIM_IMP_IQ="gain_db,phase_deg" -> a=(1+g*e^-jp)/2, b=(1-g*e^jp)/2; IRR=|a/b|^2
+  vrtsim_state->imp_iq_on = 0;
+  { const char *e = getenv("VRTSIM_IMP_IQ");
+    if (e && e[0]) {
+      double gdb = atof(e), pdeg = 0.0;
+      const char *c = strchr(e, ',');
+      if (c) pdeg = atof(c + 1);
+      const double g = pow(10.0, gdb / 20.0), p = pdeg * M_PI / 180.0;
+      const double ar = (1.0 + g * cos(p)) / 2.0, ai = -(g * sin(p)) / 2.0;
+      const double br = (1.0 - g * cos(p)) / 2.0, bi = -(g * sin(p)) / 2.0;
+      vrtsim_state->imp_iq_a = (c16_t){(int16_t)lrint(ar * 32767), (int16_t)lrint(ai * 32767)};
+      vrtsim_state->imp_iq_b = (c16_t){(int16_t)lrint(br * 32767), (int16_t)lrint(bi * 32767)};
+      vrtsim_state->imp_iq_on = 1;
+      vrtsim_state->imp_any = 1;
+      const double irr = (ar * ar + ai * ai) / (br * br + bi * bi + 1e-12);
+      LOG_A(HW, "VRTSIM: impairment IQ %s (g=%.4f p=%.1fdeg) IRR=%.1f dB\n", e, g, pdeg, 10.0 * log10(irr));
+    } }
+  // Phase noise: VRTSIM_IMP_PN_HZ=<3dB linewidth Hz>. Common-LO Wiener walk, advanced per
+  // batch (var = 2*pi*lw/fs * nsamps) — CPE-accurate, ICI under-represented (documented).
+  vrtsim_state->imp_pn_lw_hz = 0.0;
+  vrtsim_state->imp_pn_phase = 0.0;
+  vrtsim_state->imp_rng = 0x9E3779B97F4A7C15ULL;
+  { const char *e = getenv("VRTSIM_IMP_SEED"); if (e && e[0]) vrtsim_state->imp_rng ^= (uint64_t)atoll(e); }
+  { const char *e = getenv("VRTSIM_IMP_PN_HZ");
+    if (e && e[0]) {
+      vrtsim_state->imp_pn_lw_hz = atof(e);
+      if (vrtsim_state->imp_pn_lw_hz > 0.0) vrtsim_state->imp_any = 1;
+      LOG_A(HW, "VRTSIM: impairment PN linewidth %.1f Hz (common LO, batch-granular)\n", vrtsim_state->imp_pn_lw_hz);
+    } }
+  // PA: VRTSIM_IMP_PA_IBO_DB=<input backoff dB> — limiter clip at RMS*10^(IBO/20) per UE.
+  vrtsim_state->imp_pa_ibo_db = 0.0;
+  for (int u = 0; u < MAX_NUM_UES; u++) vrtsim_state->imp_pa_pow_ewma[u] = 0.0;
+  { const char *e = getenv("VRTSIM_IMP_PA_IBO_DB");
+    if (e && e[0]) {
+      vrtsim_state->imp_pa_ibo_db = atof(e);
+      if (vrtsim_state->imp_pa_ibo_db != 0.0) vrtsim_state->imp_any = 1;
+      LOG_A(HW, "VRTSIM: impairment PA limiter IBO %.1f dB (Rapp p->inf)\n", vrtsim_state->imp_pa_ibo_db);
+    } }
   // Delay spread: VRTSIM_UL_MU_DS="D_samples[,gain_db[,ang2_off]]" adds a second UL tap delayed
   // D samples (~0.52us per 64 @122.88Msps; keep within the CP, D<=250), gain_db relative to tap 1
   // (default -3), steered at angle+ang2_off (default +0.25 cyc/ant -> spatially distinct). Makes
@@ -728,11 +805,22 @@ static int vrtsim_connect(openair0_device_t *device)
     }
     vrtsim_state->channel = shm_td_iq_channel_connect(DEFAULT_CHANNEL_NAME, 10);
     vrtsim_state->peer_info.num_rx_antennas = client_info.gnb_num_rx_ant;
+    // The chanmod UL write stride is ue_id * gnb_num_rx_ant: a stale/zero published value
+    // silently collides both UEs' stream blocks (the per-launch silent-UE lottery). Loud check.
+    LOG_A(HW, "VRTSIM: client ue_id=%d received gnb_num_rx_ant=%d (UL write base=%d)\n",
+          vrtsim_state->ue_id, client_info.gnb_num_rx_ant,
+          vrtsim_state->ue_id * client_info.gnb_num_rx_ant);
+    AssertFatal(client_info.gnb_num_rx_ant >= 1, "server published gnb_num_rx_ant=%d\n", client_info.gnb_num_rx_ant);
     const uint64_t current_sample = shm_td_iq_channel_get_current_sample(vrtsim_state->channel);
     const uint64_t samples_per_frame = (uint64_t)(vrtsim_state->sample_rate / 100.0 + 0.5);
     if (samples_per_frame > 0) {
       const uint64_t frame_remainder = current_sample % samples_per_frame;
-      vrtsim_state->last_received_sample = frame_remainder == 0 ? current_sample : current_sample + samples_per_frame - frame_remainder;
+      // Align DOWN to the previous frame boundary (was: round UP to the next). Rounding up can
+      // place this client's read cursor up to a frame AHEAD of the ring cursor: every read then
+      // blocks in shm wait, the RX pipeline turns bursty for the WHOLE RUN, and that UE draws
+      // chronic sync marginality (the per-launch afflicted-UE lottery — connect-instant mod frame
+      // decided which client overshot). Behind-the-cursor content is already written: no waits.
+      vrtsim_state->last_received_sample = current_sample - frame_remainder;
       LOG_I(HW,
             "VRTSIM: client RX aligned to frame boundary current_sample=%lu aligned_sample=%lu samples_per_frame=%lu\n",
             current_sample,
@@ -1091,6 +1179,21 @@ static void perform_channel_modelling(void *arg)
                           && channel_desc->a != NULL && channel_desc->delays != NULL;
   if (!vrtsim_state->taps_socket && !vrtsim_state->use_cirdb) {
     const float pathloss_linear = powf(10, channel_desc->path_loss_dB / 20.0);
+    // TAPENERGY probe: per-UE drawn channel gain (unit-power models sum ~1.0). The afflicted-UE
+    // lottery (one UE's merge energy 10x weak, either UE, per launch) predicts E<<1 here.
+    {
+      static int tapdump = 0;
+      if (tapdump < 3 && channel_desc->a && channel_desc->nb_taps > 0) {
+        double te = 0;
+        for (int l = 0; l < channel_desc->nb_taps; l++) {
+          struct complexd av = channel_desc->a[l][local_aarx];
+          te += av.r * av.r + av.i * av.i;
+        }
+        printf("[TAPENERGY] role %d ue %d aarx %d taps %d E %.6f\n",
+               vrtsim_state->role, vrtsim_state->ue_id, local_aarx, channel_desc->nb_taps, te);
+        tapdump++;
+      }
+    }
     // Tap mutex: with Doppler on, random_channel() rewrites desc->a/desc->ch from the writer
     // thread while actors copy them here.
     if (vrtsim_state->doppler_hz > 0.0)
@@ -1215,8 +1318,15 @@ static void perform_channel_modelling(void *arg)
         double *ew = &vrtsim_state->agc_psig_ewma[aarx & 31];
         double *ns = &vrtsim_state->agc_sig_samps[aarx & 31];
         const double tau_samps = vrtsim_state->sample_rate; // 1 sim-second of samples
+        // VRTSIM_AGC_FREEZE=1: stop updating the EWMA once converged (>= tau of signal seen).
+        // For pinned-TX-power measurement runs the tracking dynamics are pure bug surface:
+        // EWMA lag on content transitions mis-sizes noise for ~tau -> per-UE abort bursts.
+        static int agc_freeze = -1;
+        if (agc_freeze < 0) { const char *e = getenv("VRTSIM_AGC_FREEZE"); agc_freeze = (e && e[0]) ? atoi(e) : 0; }
+        const int frozen = agc_freeze && (*ns >= tau_samps);
         const double alpha = (double)num_samples / tau_samps;
-        *ew = (*ew <= 0.0) ? psig : (*ew + alpha * (psig - *ew));
+        if (!frozen)
+          *ew = (*ew <= 0.0) ? psig : (*ew + alpha * (psig - *ew));
         *ns += num_samples;
         const double pref = (*ns >= tau_samps) ? *ew : psig; // converged ? slow-average : per-batch fallback
         const double pnoise = pref / pow(10.0, vrtsim_state->rx_target_snr_db / 10.0);
@@ -1228,6 +1338,16 @@ static void perform_channel_modelling(void *arg)
         snr_psig_acc += psig * num_samples;
         snr_pnoise_acc += pnoise * num_samples;
         snr_nsamp_acc += num_samples;
+        // AGCPAIR probe: expose what content the EWMA chases. Print anomalous batches
+        // (|psig/ew| > 6 dB — the crater precursors) + sparse baseline, antenna 0 only.
+        if (aarx == 0 && *ns >= tau_samps) {
+          static int agc_base_cnt = 0;
+          const double ratio_db = 10.0 * log10(psig / (*ew > 0 ? *ew : 1));
+          const bool anomal = (ratio_db > 6.0 || ratio_db < -6.0);
+          if (anomal || (agc_base_cnt++ % 2000) == 0)
+            printf("[AGCPAIR] batch psig=%.0f ew=%.0f ratio=%.1fdB nsamp=%d %s\n",
+                   psig, *ew, ratio_db, num_samples, anomal ? "ANOM" : "base");
+        }
       }
     } else {
       // Fixed global noise floor (noise_power_dBFS; pool is all-zero when unset).
@@ -1393,6 +1513,17 @@ static int vrtsim_write(openair0_device_t *device,
   if (vrtsim_state->role == ROLE_SERVER)
     timestamp += vrtsim_state->tx_sample_advance;
   bool channel_modelling = vrtsim_state->chanmod || vrtsim_state->taps_socket || vrtsim_state->use_cirdb;
+  // FIRSTWR probe: each side's first/periodic write timestamp mod slot — severe-draw displacement
+  // of the second connector's UL writes should show here directly vs the server's read cursor.
+  {
+    static long wr_cnt = 0;
+    if ((wr_cnt++ % 100000) == 0) {
+      const long sps = (long)(vrtsim_state->sample_rate / 2000.0 + 0.5); // samples per slot (mu1)
+      printf("[FIRSTWR] role %d ue %d ts %ld mod_slot %ld nsamps %d\n",
+             vrtsim_state->role, vrtsim_state->ue_id, (long)timestamp,
+             sps > 0 ? (long)(timestamp % sps) : -1, nsamps);
+    }
+  }
   if (channel_modelling) {
     return vrtsim_write_with_chanmod(vrtsim_state, timestamp, samplesVoid, nsamps, nbAnt, flags);
   }
@@ -1446,6 +1577,16 @@ static int vrtsim_read(openair0_device_t *device, openair0_timestamp_t *ptimesta
   }
   const uint64_t read_sample = vrtsim_state->last_received_sample
                                + (vrtsim_state->role == ROLE_SERVER ? vrtsim_state->ul_read_advance : 0);
+  // RDMARGIN probe: client DL read distance behind the live ring cursor. The afflicted-UE
+  // lottery predicts a periodically-collapsing margin (drift beat ~3 frames) on one client.
+  if (vrtsim_state->role == ROLE_CLIENT) {
+    static long rd_cnt = 0;
+    if ((rd_cnt++ % 50000) == 0) {
+      long margin = (long)(shm_td_iq_channel_get_current_sample(vrtsim_state->channel)
+                           - vrtsim_state->last_received_sample);
+      printf("[RDMARGIN] ue %d margin %ld\n", vrtsim_state->ue_id, margin);
+    }
+  }
   if (vrtsim_state->role == ROLE_SERVER) {
     uint64_t timeout_uS = 0; // 0 means no timeout
     shm_td_iq_channel_wait(vrtsim_state->channel, read_sample + nsamps, timeout_uS);
@@ -1550,6 +1691,19 @@ static int vrtsim_read(openair0_device_t *device, openair0_timestamp_t *ptimesta
             if (ret != 0 && rx_ret == 0)
               rx_ret = ret;
             const int16_t *in = (const int16_t *)vrtsim_state->ul_combine_buffer;
+            // UEMERGE census: per-UE contribution energy at the server merge (severe-draw hunt:
+            // a silent/displaced UE shows e~0 here while its client writes on time).
+            if (a == 0) {
+              static long ue_e_acc[8], ue_n_acc[8];
+              static int census_cnt;
+              long e = 0;
+              for (int i = 0; i < nsamps * 2; i += 16) e += abs(in[i]);
+              ue_e_acc[u & 7] += e; ue_n_acc[u & 7]++;
+              if (u == vrtsim_state->num_ues - 1 && (++census_cnt % 20000) == 0)
+                printf("[UEMERGE] samp %lu e0=%ld e1=%ld\n", (unsigned long)read_sample,
+                       ue_e_acc[0] / (ue_n_acc[0] ? ue_n_acc[0] : 1),
+                       ue_e_acc[1] / (ue_n_acc[1] ? ue_n_acc[1] : 1));
+            }
             int16_t *out = (int16_t *)samplesVoid[a];
             for (int i = 0; i < nsamps * 2; i++) {
               int32_t sum = (int32_t)out[i] + (int32_t)in[i];
@@ -1583,6 +1737,51 @@ static int vrtsim_read(openair0_device_t *device, openair0_timestamp_t *ptimesta
           }
           if (ret != 0 && rx_ret == 0)
             rx_ret = ret;
+          // HW impairment: UE PA limiter — clip |x| at RMS*10^(IBO/20) (Rapp p->inf), pre-merge.
+          if (vrtsim_state->imp_pa_ibo_db != 0.0
+              && (!vrtsim_state->imp_after_attach || vrtsim_state->ul_mu_steer_active)) {
+            int16_t *s = (int16_t *)vrtsim_state->ul_combine_buffer;
+            double acc = 0.0;
+            for (int i = 0; i < nsamps; i++)
+              acc += (double)s[2 * i] * s[2 * i] + (double)s[2 * i + 1] * s[2 * i + 1];
+            double *ew = &vrtsim_state->imp_pa_pow_ewma[u];
+            *ew = (*ew == 0.0) ? acc / nsamps : 0.99 * *ew + 0.01 * acc / nsamps;
+            const double xs2 = *ew * pow(10.0, vrtsim_state->imp_pa_ibo_db / 10.0);
+            if (xs2 > 0.0) {
+              for (int i = 0; i < nsamps; i++) {
+                const double r2 = (double)s[2 * i] * s[2 * i] + (double)s[2 * i + 1] * s[2 * i + 1];
+                if (r2 > xs2) {
+                  const double sc = sqrt(xs2 / r2);
+                  s[2 * i] = (int16_t)lrint(s[2 * i] * sc);
+                  s[2 * i + 1] = (int16_t)lrint(s[2 * i + 1] * sc);
+                }
+              }
+            }
+          }
+          // HW impairment: per-UE residual CFO — in-place rotation of this UE's samples
+          // pre-merge (phasor recursion, renorm per batch; ~1 cmul/sample, budget-safe).
+          if (vrtsim_state->imp_any && vrtsim_state->imp_cfo_hz[u] != 0.0
+              && (!vrtsim_state->imp_after_attach || vrtsim_state->ul_mu_steer_active)) {
+            if (vrtsim_state->imp_cfo_cos[u] == 1.0 && vrtsim_state->imp_cfo_sin[u] == 0.0) {
+              const double d = 2.0 * M_PI * vrtsim_state->imp_cfo_hz[u] / (double)vrtsim_state->sample_rate;
+              vrtsim_state->imp_cfo_cos[u] = cos(d);
+              vrtsim_state->imp_cfo_sin[u] = sin(d);
+            }
+            int16_t *s = (int16_t *)vrtsim_state->ul_combine_buffer;
+            double pr = vrtsim_state->imp_cfo_pr[u], pi_ = vrtsim_state->imp_cfo_pi[u];
+            const double cs = vrtsim_state->imp_cfo_cos[u], sn = vrtsim_state->imp_cfo_sin[u];
+            for (int i = 0; i < nsamps; i++) {
+              const double xr = s[2 * i], xi = s[2 * i + 1];
+              s[2 * i]     = (int16_t)lrint(xr * pr - xi * pi_);
+              s[2 * i + 1] = (int16_t)lrint(xr * pi_ + xi * pr);
+              const double npr = pr * cs - pi_ * sn;
+              pi_ = pr * sn + pi_ * cs;
+              pr = npr;
+            }
+            const double mag = sqrt(pr * pr + pi_ * pi_);
+            vrtsim_state->imp_cfo_pr[u] = pr / mag;
+            vrtsim_state->imp_cfo_pi[u] = pi_ / mag;
+          }
           const int16_t *in = (const int16_t *)vrtsim_state->ul_combine_buffer;
           for (int aarx = 0; aarx < nbAnt; aarx++) {
             if (samplesVoid[aarx] == NULL)
@@ -1631,6 +1830,48 @@ static int vrtsim_read(openair0_device_t *device, openair0_timestamp_t *ptimesta
                 out[2 * i + 1] = (int16_t)((oi > 32767) ? 32767 : (oi < -32768) ? -32768 : oi);
               }
             }
+          }
+        }
+      }
+      // Phase-3 impairment: common-LO phase noise — one rotation for ALL antennas this batch
+      // (Wiener walk advanced per batch; Box-Muller from xorshift64).
+      if (vrtsim_state->imp_pn_lw_hz > 0.0
+          && (!vrtsim_state->imp_after_attach || vrtsim_state->ul_mu_steer_active)) {
+        uint64_t *r = &vrtsim_state->imp_rng;
+        *r ^= *r << 13; *r ^= *r >> 7; *r ^= *r << 17;
+        const double u1 = ((*r >> 11) + 1.0) / 9007199254740993.0;
+        *r ^= *r << 13; *r ^= *r >> 7; *r ^= *r << 17;
+        const double u2 = ((*r >> 11) + 1.0) / 9007199254740993.0;
+        const double sigma = sqrt(2.0 * M_PI * vrtsim_state->imp_pn_lw_hz
+                                  / (double)vrtsim_state->sample_rate * (double)nsamps);
+        vrtsim_state->imp_pn_phase += sigma * sqrt(-2.0 * log(u1)) * cos(2.0 * M_PI * u2);
+        const int16_t cr = (int16_t)lrint(cos(vrtsim_state->imp_pn_phase) * 32767.0);
+        const int16_t ci = (int16_t)lrint(sin(vrtsim_state->imp_pn_phase) * 32767.0);
+        for (int aarx = 0; aarx < nbAnt; aarx++) {
+          if (samplesVoid[aarx] == NULL)
+            continue;
+          int16_t *out = (int16_t *)samplesVoid[aarx];
+          for (int i = 0; i < nsamps; i++) {
+            const int32_t xr = out[2 * i], xi = out[2 * i + 1];
+            out[2 * i]     = (int16_t)((xr * cr - xi * ci) >> 15);
+            out[2 * i + 1] = (int16_t)((xr * ci + xi * cr) >> 15);
+          }
+        }
+      }
+      // Phase-2 impairment: gNB RX IQ imbalance — post-merge per-antenna y = a*x + b*conj(x)
+      if (vrtsim_state->imp_iq_on
+          && (!vrtsim_state->imp_after_attach || vrtsim_state->ul_mu_steer_active)) {
+        const c16_t A = vrtsim_state->imp_iq_a, B = vrtsim_state->imp_iq_b;
+        for (int aarx = 0; aarx < nbAnt; aarx++) {
+          if (samplesVoid[aarx] == NULL)
+            continue;
+          int16_t *out = (int16_t *)samplesVoid[aarx];
+          for (int i = 0; i < nsamps; i++) {
+            const int32_t xr = out[2 * i], xi = out[2 * i + 1];
+            int32_t yr = (xr * A.r - xi * A.i + xr * B.r + xi * B.i) >> 15;
+            int32_t yi = (xr * A.i + xi * A.r + xr * B.i - xi * B.r) >> 15;
+            out[2 * i]     = (int16_t)((yr > 32767) ? 32767 : (yr < -32768) ? -32768 : yr);
+            out[2 * i + 1] = (int16_t)((yi > 32767) ? 32767 : (yi < -32768) ? -32768 : yi);
           }
         }
       }
@@ -1717,6 +1958,20 @@ static int vrtsim_read(openair0_device_t *device, openair0_timestamp_t *ptimesta
           int16_t *s = (int16_t *)samplesVoid[aarx];
           for (int i = 0; i < nsamps * 2; i++)
             s[i] = (int16_t)(s[i] >> sh);
+        }
+      } else if (vrtsim_state->ul_atten_shift < 0) {
+        // Negative = digital GAIN (saturating left-shift): SNR-neutral under AGC (noise re-pins to
+        // signal), restores int16 headroom lost to small per-antenna amplitudes at high Nrx
+        // (|h|~80 at 16RX starves the fixed-point chest/LLR chain: LLR mean ~12 -> LDPC-marginal).
+        const int sh = -vrtsim_state->ul_atten_shift;
+        for (int aarx = 0; aarx < nbAnt; aarx++) {
+          if (samplesVoid[aarx] == NULL)
+            continue;
+          int16_t *s = (int16_t *)samplesVoid[aarx];
+          for (int i = 0; i < nsamps * 2; i++) {
+            int32_t v = ((int32_t)s[i]) << sh;
+            s[i] = (int16_t)(v > 32767 ? 32767 : (v < -32768 ? -32768 : v));
+          }
         }
       }
       // Add INDEPENDENT per-antenna noise (identical signal + independent noise = array gain on combine).

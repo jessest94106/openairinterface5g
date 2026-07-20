@@ -41,6 +41,11 @@
 #include <openair1/PHY/TOOLS/phy_scope_interface.h>
 #include "PHY/log_tools.h"
 
+// SRS-derived MU pair correlation, published by the SRS RX phase, read by the MAC
+// cosched screen (OAI_MU_PAIR_SCREEN). Racy read tolerated (screening hint).
+volatile int g_srs_pair_corr_pct = 0;
+volatile int g_srs_pair_corr_frame = -1;
+
 //#define DEBUG_RXDATA
 //#define SRS_IND_DEBUG
 // Per-antenna, PRE-COMBINING SNR: what a single RX antenna sees in the air, before MRC.
@@ -531,7 +536,7 @@ static int nr_ulsch_procedures(PHY_VARS_gNB *gNB, int frame_rx, int slot_rx, boo
     const bool abort_decode = check_abort(&ulsch_harq->abort_decode);
     if (crc_valid && !abort_decode && !pusch->DTX) {
       static int ulsch_ack_trace_count = 0;
-      if (ulsch_ack_trace_count < 32) {
+      static int ulsch_trace_cap = -1; if (ulsch_trace_cap < 0) { const char *e = getenv("OAI_ULSCH_TRACE_CAP"); ulsch_trace_cap = (e && e[0]) ? atoi(e) : 32; } if (ulsch_ack_trace_count < ulsch_trace_cap) {
         LOG_I(PHY,
               "ULSCH ACK trace %d.%d rnti %04x harq %d round %d rv %d crc_valid %d processed %d/%d abort %d dtx %d TBS %d rb %d+%d sym %d+%d mcs %d Qm %d SNR %.1f dB preSNR %s dB TAest %d\n",
               ulsch->frame,
@@ -578,7 +583,7 @@ static int nr_ulsch_procedures(PHY_VARS_gNB *gNB, int frame_rx, int slot_rx, boo
       ulsch->last_iteration_cnt = ulsch->max_ldpc_iterations - 1; // Setting to max_ldpc_iterations - 1 is sufficient given that this variable is only used for checking for failure
     } else {
       static int ulsch_nak_trace_count = 0;
-      if (ulsch_nak_trace_count < 32) {
+      static int ulsch_ntrace_cap = -1; if (ulsch_ntrace_cap < 0) { const char *e = getenv("OAI_ULSCH_TRACE_CAP"); ulsch_ntrace_cap = (e && e[0]) ? atoi(e) : 32; } if (ulsch_nak_trace_count < ulsch_ntrace_cap) {
         LOG_W(PHY,
               "ULSCH NAK trace %d.%d rnti %04x harq %d round %d rv %d crc_valid %d processed %d/%d abort %d dtx %d TBS %d rb %d+%d sym %d+%d mcs %d Qm %d SNR %.1f dB preSNR %s dB TAest %d\n",
               ulsch->frame,
@@ -644,6 +649,23 @@ static void nr_fill_indication(PHY_VARS_gNB *gNB,
   NR_gNB_PUSCH *pusch = &gNB->pusch_vars[ULSCH_id];
 
   nfapi_nr_pusch_pdu_t *pusch_pdu = &harq_process->ulsch_pdu;
+  // FAILCLASS probe: single choke-point for every CRC indication — classify the MU phantom-BLER
+  // (round-1s with no NAK trace / no DTX / no requeue-starve: which flag carries them?).
+  if (crc_flag != 0) {
+    static int failclass_cnt = 0;
+    if (failclass_cnt < 3000) {
+      printf("[FAILCLASS] %d.%d rnti %04x harq %d round %d dtx %d abort %d procseg %d/%d pwr %d npwr %d llr %d\n",
+             frame, slot_rx, gNB->ulsch[ULSCH_id].rnti, harq_pid, harq_process->round,
+             pusch->DTX, check_abort(&harq_process->abort_decode), harq_process->processedSegments,
+             harq_process->C, dB_fixed_x10(pusch->ulsch_power_tot), dB_fixed_x10(pusch->ulsch_noise_power_tot),
+             pusch->last_llr_mean);
+      printf("[FAILCLASS2] %d.%d rnti %04x log2h %d Qm %d mcs %d synclog2h %d syncllr %d\n",
+             frame, slot_rx, gNB->ulsch[ULSCH_id].rnti, pusch->log2_maxh,
+             pusch_pdu->qam_mod_order, pusch_pdu->mcs_index,
+             harq_process->dbg_log2h, harq_process->dbg_llr);
+      failclass_cnt++;
+    }
+  }
 
   // Get estimated timing advance for MAC
   const int sync_pos = gNB->ulsch[ULSCH_id].delay.est_delay;
@@ -1153,7 +1175,7 @@ int phy_procedures_gNB_uespec_RX(PHY_VARS_gNB *gNB, int frame_rx, int slot_rx, N
   // ever run (the parte leak). Serial and in-thread: no new concurrency in the real-time path.
   {
     static int mu_tp = -1;
-    if (mu_tp < 0) { const char *e = getenv("OAI_UL_MU_IRC"); mu_tp = (e && e[0]) ? 1 : 0; }
+    if (mu_tp < 0) { const char *e = getenv("OAI_UL_MU_IRC"); mu_tp = (e && e[0]) ? atoi(e) : 0; } // "0" must mean OFF (was truthy -> half-engaged two-phase: serial hoist w/o IRC decode = starvation surface)
     extern volatile int g_mu_mimo_active;
     if (mu_tp && g_mu_mimo_active) {
       int ids[gNB->max_nb_pusch], n = 0;
@@ -1313,6 +1335,9 @@ int phy_procedures_gNB_uespec_RX(PHY_VARS_gNB *gNB, int frame_rx, int slot_rx, N
     if (!(srs && srs->active && srs->frame == frame_rx && srs->slot == slot_rx))
       continue;
     LOG_D(NR_PHY, "(%d.%d) gNB is waiting for SRS, id = %i\n", frame_rx, slot_rx, i);
+    { static int srsprobe = 0; if (srsprobe++ < 64)
+        printf("[SRSPROBE] %d.%d rnti %04x id %d usage %d nsym %d\n", frame_rx, slot_rx,
+               srs->srs_pdu.rnti, i, srs->srs_pdu.srs_parameters_v4.usage, 1 << srs->srs_pdu.num_symbols); }
 
     start_meas(&gNB->rx_srs_stats);
 
@@ -1347,6 +1372,61 @@ int phy_procedures_gNB_uespec_RX(PHY_VARS_gNB *gNB, int frame_rx, int slot_rx, N
     if ((gNB->srs->snr * 10) < gNB->srs_thres) {
       srs_est = -1;
     }
+    // SRS spatial signatures for MU pairing (C2): keep the per-antenna average vector per
+    // rnti, publish |corr| of the latest pair for the MAC's cosched screen. Slot-stamped,
+    // racy-read tolerable (screening decision, refreshed every SRS period).
+    if (srs_est >= 0) {
+      static struct { uint16_t rnti; int frame; long re[16], im[16]; } spat[2];
+      static int spat_n = 0;
+      int si = -1;
+      for (int s = 0; s < spat_n; s++) if (spat[s].rnti == srs_pdu->rnti) si = s;
+      if (si < 0 && spat_n < 2) si = spat_n++;
+      if (si >= 0) {
+        spat[si].rnti = srs_pdu->rnti;
+        spat[si].frame = frame_rx;
+        for (int a = 0; a < nb_antennas_rx && a < 16; a++) {
+          long sr = 0, sim_ = 0; int n = 0;
+          for (int k = 0; k < ofdm_symbol_size; k++) {
+            c16_t v = srs_estimated_channel_freq[a][0][k];
+            if (v.r || v.i) { sr += v.r; sim_ += v.i; n++; }
+          }
+          spat[si].re[a] = n ? sr / n : 0;
+          spat[si].im[a] = n ? sim_ / n : 0;
+        }
+        if (spat_n == 2) {
+          double nre = 0, nim = 0, e0 = 0, e1 = 0;
+          for (int a = 0; a < nb_antennas_rx && a < 16; a++) {
+            nre += (double)spat[0].re[a] * spat[1].re[a] + (double)spat[0].im[a] * spat[1].im[a];
+            nim += (double)spat[0].im[a] * spat[1].re[a] - (double)spat[0].re[a] * spat[1].im[a];
+            e0 += (double)spat[0].re[a] * spat[0].re[a] + (double)spat[0].im[a] * spat[0].im[a];
+            e1 += (double)spat[1].re[a] * spat[1].re[a] + (double)spat[1].im[a] * spat[1].im[a];
+          }
+          extern volatile int g_srs_pair_corr_pct, g_srs_pair_corr_frame;
+          if (e0 > 0 && e1 > 0)
+            g_srs_pair_corr_pct = (int)(100.0 * sqrt((nre * nre + nim * nim) / (e0 * e1)));
+          g_srs_pair_corr_frame = frame_rx;
+          static int corrlog = 0;
+          if ((corrlog++ & 0x1F) == 0)
+            printf("[SRSCORR] %d.%d pair %04x/%04x corr %d%%\n",
+                   frame_rx, slot_rx, spat[0].rnti, spat[1].rnti, g_srs_pair_corr_pct);
+        }
+      }
+    }
+    // Phase-B ground truth: per-antenna average estimate — phase ramp across antennas must
+    // match the injected steering DFT (2*pi*ang per antenna). Strip before commit.
+    { static int srsch = 0;
+      srsch++;
+      if (srsch > 40 && srsch <= 56 && srs_est >= 0) {
+        for (int a = 0; a < nb_antennas_rx; a++) {
+          long sr = 0, si = 0; int n = 0;
+          for (int k = 0; k < ofdm_symbol_size; k++) {
+            c16_t v = srs_estimated_channel_freq[a][0][k];
+            if (v.r != 0 || v.i != 0) { sr += v.r; si += v.i; n++; }
+          }
+          printf("[SRSCH] %d.%d rnti %04x ant %d avg %ld %ld n %d\n",
+                 frame_rx, slot_rx, srs_pdu->rnti, a, n ? sr / n : 0, n ? si / n : 0, n);
+        }
+      } }
 
     UL_INFO->srs_ind.sfn = frame_rx;
     UL_INFO->srs_ind.slot = slot_rx;
@@ -1354,6 +1434,9 @@ int phy_procedures_gNB_uespec_RX(PHY_VARS_gNB *gNB, int frame_rx, int slot_rx, N
     // data model difficult to understand, nfapi do malloc for this pointer
     UL_INFO->srs_ind.pdu_list = UL_INFO->srs_pdu_list;
     nfapi_nr_srs_indication_pdu_t *srs_indication = UL_INFO->srs_pdu_list + UL_INFO->srs_ind.number_of_pdus++;
+    { static int srsind = 0; if (srsind++ < 64)
+        printf("[SRSIND] %d.%d rnti %04x est %d snr %d ta %u\n", frame_rx, slot_rx,
+               srs_pdu->rnti, srs_est, gNB->srs->snr, timing_advance_offset); }
     srs_indication->handle = srs_pdu->handle;
     srs_indication->rnti = srs_pdu->rnti;
     srs_indication->timing_advance_offset = srs_est >= 0 ? timing_advance_offset : 0xFFFF;

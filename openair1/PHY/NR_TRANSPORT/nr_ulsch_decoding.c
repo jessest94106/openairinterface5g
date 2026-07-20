@@ -134,6 +134,20 @@ int nr_ulsch_decoding(PHY_VARS_gNB *phy_vars_gNB,
     nrLDPC_TB_decoding_parameters_t *TB_parameters = &TBs[pusch_id];
 
     TB_parameters->G = G[pusch_id];
+    // per-TB synchronous forensics (artifact-proof: captured here, printed at indication)
+    harq_process->dbg_log2h = pusch->log2_maxh;
+    harq_process->dbg_llr = pusch->last_llr_mean;
+    // DECPARAM probe: decode-side parameters per TB, to diff chained vs clean TBs offline
+    {
+      static int decparam_cnt = 0;
+      if (decparam_cnt < 400 || (decparam_cnt % 29) == 0)
+        printf("[DECPARAM] %d.%d rnti %04x hpid %d rv %d ndi %d TBS %d G %u mcs %d Qm %d nID %d rb %d+%d lay %d\n",
+               frame, nr_tti_rx, ulsch->rnti, ulsch->harq_pid, pusch_pdu->pusch_data.rv_index,
+               pusch_pdu->pusch_data.new_data_indicator, pusch_pdu->pusch_data.tb_size, G[pusch_id],
+               pusch_pdu->mcs_index, pusch_pdu->qam_mod_order, pusch_pdu->data_scrambling_id,
+               pusch_pdu->rb_start, pusch_pdu->rb_size, pusch_pdu->nrOfLayers);
+      decparam_cnt++;
+    }
 
     if (!harq_process) {
       LOG_E(PHY, "ulsch_decoding.c: NULL harq_process pointer\n");

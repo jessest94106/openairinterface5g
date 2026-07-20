@@ -550,7 +550,7 @@ static void nr_dci_decoding_procedure(const UE_nr_rxtx_proc_t *proc,
 
       rnti_t n_rnti = rel15->rnti;
       if (crc == n_rnti) {
-        LOG_D(NR_PHY_DCI,
+        LOG_I(NR_PHY_DCI,
               "(%i.%i) Received dci indication (rnti %x,dci format %d,n_CCE %d,payloadSize %d,payload %llx)\n",
               proc->frame_rx,
               proc->nr_slot_rx,
@@ -612,6 +612,9 @@ void nr_pdcch_dci_indication(const UE_nr_rxtx_proc_t *proc,
 
   nr_downlink_indication_t dl_indication;
   fapi_nr_dci_indication_t dci_ind = {.SFN = proc->frame_rx, .slot = proc->nr_slot_rx};
+  // PDCCHATT probe: one line per monitored slot — a slot with grants sent but NO att line = UE
+  // skipped PDCCH processing entirely (real-time drop); att present + no success = decode failure.
+  printf("[PDCCHATT] %d.%d nss %d\n", proc->frame_rx, proc->nr_slot_rx, phy_pdcch_config->nb_search_space);
 
   for (int ss_idx = 0; ss_idx < phy_pdcch_config->nb_search_space; ss_idx++) {
     fapi_nr_dl_config_dci_dl_pdu_rel15_t *rel15 = &phy_pdcch_config->pdcch_config[ss_idx];

@@ -27,6 +27,9 @@
 #include "xran_fh_o_du.h"
 #include "xran_compression.h"
 #include "armral_bfp_compression.h"
+#ifndef RU_RX_SLOT_DEPTH
+#define RU_RX_SLOT_DEPTH 8 // MUST match openair1/PHY/defs_RU.h (L1 rxdataF ring depth)
+#endif
 #include "oai_bfp_compression.h"
 
 #if defined(__arm__) || defined(__aarch64__)
@@ -211,6 +214,7 @@ static int read_prach_data(ru_info_t *ru, int frame, int slot)
   int nb_rx_per_ru = ru->nb_rx / fh_init->xran_ports;
   /* If it is PRACH slot, copy prach IQ from XRAN PRACH buffer to OAI PRACH buffer */
   if (is_prach_slot) {
+    printf("[PRACHPAIR FILL] f=%d s=%d buf=%p\n", frame, slot, (void *)ru->prach_buf);
     if (!ru->prach_buf) {
       LOG_W(HW, "we get rach data from ru, but it is not scheduled %d.%d\n", frame, slot);
       return -1;
@@ -325,8 +329,9 @@ static int read_prach_data(ru_info_t *ru, int frame, int slot)
           bool should_log = false;
 #endif
           if (should_log) {
-            printf("[gNB PRACH RX] ENTER: frame=%d, slot=%d, sym=%d, aa=%d, iqWidth=%d, payload_len=%d, non_zero_compressed=%d/%d, g_kbar=%d\n",
-                  frame, slot, sym_idx, aa, ru_conf->iqWidth_PRACH, payload_len, non_zero_compressed, payload_len, g_kbar);
+            printf("[gNB PRACH RX] ENTER: frame=%d, slot=%d, sym=%d, aa=%d, iqWidth=%d, payload_len=%d, non_zero_compressed=%d/%d, g_kbar=%d prach_buf=%p dst=%p\n",
+                  frame, slot, sym_idx, aa, ru_conf->iqWidth_PRACH, payload_len, non_zero_compressed, payload_len, g_kbar,
+                  (void *)ru->prach_buf, (void *)dst);
             LOG_I(HW, "[gNB PRACH RX] Compressed input: [0]=0x%02x [1]=0x%02x [27]=0x%02x [28]=0x%02x [29]=0x%02x [55]=0x%02x [56]=0x%02x\n",
                   ((uint8_t*)src)[0], ((uint8_t*)src)[1], ((uint8_t*)src)[27], ((uint8_t*)src)[28],
                   ((uint8_t*)src)[29], ((uint8_t*)src)[55], ((uint8_t*)src)[56]);
@@ -610,7 +615,7 @@ int xran_fh_rx_read_slot(ru_info_t *ru, int *frame, int *slot)
   const struct xran_fh_init *fh_init = get_xran_fh_init();
   int fftsize = 1 << fh_cfg->nULFftSize;
 
-  int slot_offset_rxdata = 3 & (*slot);
+  int slot_offset_rxdata = (*slot) % RU_RX_SLOT_DEPTH; // MUST match L1's rxdataF ring (defs_RU.h); was hardcoded 3&slot
   uint32_t slot_size = 4 * 14 * fftsize;
   uint8_t *rx_data = (uint8_t *)ru->rxdataF[0];
   uint8_t *start_ptr = NULL;

@@ -120,7 +120,7 @@ void phy_init_nr_gNB(PHY_VARS_gNB *gNB)
   int max_ul_mimo_layers = 4;
 
   AssertFatal(Ptx > 0 && Ptx < 9,"Ptx %d is not supported\n", Ptx);
-  AssertFatal(Prx > 0 && Prx < 9,"Prx %d is not supported\n", Prx);
+  AssertFatal(Prx > 0 && Prx < 17,"Prx %d is not supported\n", Prx);
   LOG_D(PHY, "[gNB %d]About to wait for gNB to be configured\n", gNB->Mod_id);
 
   while(gNB->configured == 0)
@@ -216,6 +216,11 @@ void phy_init_nr_gNB(PHY_VARS_gNB *gNB)
     pusch->llr = (int16_t *)malloc16_clear((8 * ((3 * 8 * 6144) + 12))
                                            * sizeof(int16_t)); // [hna] 6144 is LTE and (8*((3*8*6144)+12)) is not clear
     pusch->ul_valid_re_per_slot = (int16_t *)malloc16_clear(sizeof(int16_t) * fp->symbols_per_slot);
+    const size_t slot_scratch_len = (size_t)N_RB_UL * NR_NB_SC_PER_RB * fp->symbols_per_slot;
+    pusch->dmrs_slot_scratch = (c16_t *)malloc16_clear(sizeof(c16_t) * max_ul_mimo_layers * slot_scratch_len);
+    pusch->chest_dmrs_pos_scratch = (c16_t *)malloc16_clear(sizeof(c16_t) * slot_scratch_len * max_ul_mimo_layers * Prx);
+    pusch->chest_interpl_scratch = (c16_t *)malloc16_clear(sizeof(c16_t) * slot_scratch_len * max_ul_mimo_layers * Prx);
+    pusch->rxFext_slot_scratch = (c16_t *)malloc16_clear(sizeof(c16_t) * Prx * slot_scratch_len);
   } // ulsch_id
 }
 
@@ -278,6 +283,10 @@ void phy_free_nr_gNB(PHY_VARS_gNB *gNB)
     free_and_zero(pusch_vars->rxdataF_comp);
 
     free_and_zero(pusch_vars->llr);
+    free_and_zero(pusch_vars->dmrs_slot_scratch);
+    free_and_zero(pusch_vars->chest_dmrs_pos_scratch);
+    free_and_zero(pusch_vars->chest_interpl_scratch);
+    free_and_zero(pusch_vars->rxFext_slot_scratch);
   } // ULSCH_id
   free(gNB->pusch_vars);
 

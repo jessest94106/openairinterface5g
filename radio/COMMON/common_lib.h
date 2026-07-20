@@ -241,22 +241,22 @@ typedef struct openair0_config {
   int32_t *txbase[8];
   //! \brief Center frequency in Hz for RX.
   //! index: [0..rx_num_channels[
-  double rx_freq[8];
+  double rx_freq[16];
   //! \brief Center frequency in Hz for TX.
   //! index: [0..rx_num_channels[ !!! see lte-ue.c:427 FIXME iterates over rx_num_channels
-  double tx_freq[8];
+  double tx_freq[16];
   double tune_offset;
   //! \brief memory
   //! \brief Pointer to Calibration table for RX gains
   rx_gain_calib_table_t *rx_gain_calib_table;
   //! \brief Gain for RX in dB.
   //! index: [0..rx_num_channels]
-  double rx_gain[8];
+  double rx_gain[16];
   //! \brief Gain offset (for calibration) in dB
   //! index: [0..rx_num_channels]
   double rx_gain_offset[8];
   //! gain for TX in dB
-  double tx_gain[8];
+  double tx_gain[16];
   //! RX bandwidth in Hz
   double rx_bw;
   //! TX bandwidth in Hz

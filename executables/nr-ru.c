@@ -640,8 +640,8 @@ void fill_rf_config(RU_t *ru, char *rf_config_file)
 
   cfg->configFilename = rf_config_file;
 
-  AssertFatal(ru->nb_tx > 0 && ru->nb_tx <= 8, "openair0 does not support more than 8 antennas\n");
-  AssertFatal(ru->nb_rx > 0 && ru->nb_rx <= 8, "openair0 does not support more than 8 antennas\n");
+  AssertFatal(ru->nb_tx > 0 && ru->nb_tx <= 16, "openair0 does not support more than 8 antennas\n");
+  AssertFatal(ru->nb_rx > 0 && ru->nb_rx <= 16, "openair0 does not support more than 8 antennas\n");
 
   cfg->num_rb_dl = N_RB;
   cfg->tx_num_channels = ru->nb_tx * ru->num_beams_period;

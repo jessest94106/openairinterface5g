@@ -135,6 +135,10 @@ const NR_tda_info_t *get_best_ul_tda(const gNB_MAC_INST *nrmac, int beam, const 
     uint16_t tda_mask = SL_to_bitmap(tdas->startSymbolIndex, tdas->nrOfSymbols);
     get_max_rb_range(vrb_map_UL, nrmac->ulprbbl, tda_mask, &start, &len);
     uint64_t s = (uint64_t)tdas->nrOfSymbols * len;
+    // a TDA that cannot meet the minimum grant is unusable downstream
+    // (n_rb_sched < min_rb skips the slot) — any eligible TDA must outrank it
+    if (len < nrmac->min_grant_prb)
+      s = len;
     if (s > score) {
       best_tda = tdas;
       score = s;
@@ -1520,6 +1524,8 @@ void handle_nr_srs_measurements(const module_id_t module_id,
 {
   gNB_MAC_INST *nrmac = RC.nrmac[module_id];
   LOG_D(NR_MAC, "(%d.%d) Received SRS indication for UE %04x\n", frame, slot, srs_ind->rnti);
+  { static int srsmac = 0; if (srsmac++ < 64)
+      printf("[SRSMAC] %d.%d rnti %04x usage %d ta %u\n", frame, slot, srs_ind->rnti, srs_ind->srs_usage, srs_ind->timing_advance_offset); }
   if (srs_ind->report_type == 0) {
     //SCF 222.10.04 Table 3-129 Report type = 0 means a null report, we can skip unpacking it
     return;
@@ -1909,6 +1915,7 @@ static bool allocate_ul_retransmission(gNB_MAC_INST *nrmac,
 
   sched_ctrl->cce_index = CCEIndex;
   fill_pdcch_vrb_map(nrmac, CC_id, &sched_ctrl->sched_pdcch, CCEIndex, sched_ctrl->aggregation_level, dci_beam_idx);
+  printf("[ULDCI] %d.%d rnti %04x AL %d cce %d retx\n", frame, slot, UE->rnti, sched_ctrl->aggregation_level, CCEIndex);
 
   // signal new allocation
   DevAssert(new_sched.time_domain_allocation == tda);
@@ -2016,17 +2023,32 @@ static int  pf_ul(gNB_MAC_INST *nrmac,
   // MU regime = co-scheduling requested AND the MU regime is active. Used for BOTH the per-UE
   // "always a candidate" bypass (below) and the same-PRB overlap (allocation loop).
   static int mu_cosched = -1;
-  if (mu_cosched < 0) { const char *e = getenv("OAI_UL_MU_COSCHED"); mu_cosched = (e && e[0]) ? 1 : 0; }
+  if (mu_cosched < 0) { const char *e = getenv("OAI_UL_MU_COSCHED"); mu_cosched = (e && e[0]) ? atoi(e) : 0; }
   const bool mu_regime = mu_cosched && g_mu_mimo_active;
   { static long gd = 0; if (mu_cosched && (gd++ % 2000) == 0)
       LOG_E(NR_MAC, "[MU STATE] g_mu=%d connected=%d any_ra=%d trig_latched=%d\n",
             g_mu_mimo_active, connected_ues, any_ra_in_progress, mu_trigger_latched); }
+
+  /* SRS-driven MU pairing screen (C2): when the L1-published pair correlation exceeds the
+   * threshold, fall back to slot-parity TDM instead of co-scheduling a correlated pair. */
+  static int pair_screen_thr = -2;
+  if (pair_screen_thr == -2) { const char *e = getenv("OAI_MU_PAIR_SCREEN"); pair_screen_thr = (e && e[0]) ? atoi(e) : -1; }
+  extern volatile int g_srs_pair_corr_pct, g_srs_pair_corr_frame;
+  const bool pair_screen_hit = pair_screen_thr >= 0 && mu_cosched && g_srs_pair_corr_frame >= 0
+                               && ((frame - g_srs_pair_corr_frame + 1024) % 1024) < 64
+                               && g_srs_pair_corr_pct > pair_screen_thr;
+  { static long ps_log = 0; if (pair_screen_hit && (ps_log++ % 2000) == 0)
+      LOG_E(NR_MAC, "[PAIR SCREEN] corr %d%% > thr %d%% -> TDM fallback\n", g_srs_pair_corr_pct, pair_screen_thr); }
+  int ue_iter_idx = -1;
 
   /* Loop UE_list to calculate throughput and coeff */
   UE_iterator(UE_list, UE) {
 
     NR_UE_sched_ctrl_t *sched_ctrl = &UE->UE_sched_ctrl;
     if (!nr_mac_ue_is_active(UE))
+      continue;
+    ue_iter_idx++;
+    if (pair_screen_hit && UE->ra == NULL && (ue_iter_idx & 1) != (sched_slot & 1))
       continue;
     // MU policy: never grant a co-scheduled UE while its PDCCH state is CSS/0_0 (fallback) — a
     // 0_0 grant cannot carry the DMRS port, the UE correctly defaults to port 0, and the slot is
@@ -2167,7 +2189,9 @@ static int  pf_ul(gNB_MAC_INST *nrmac,
                                         nrOfLayers)
                          >> 3;
     float coeff_ue = (float) tbs / UE->ul_thr_ue;
-    bool sched_inactive = B == 0 && do_sched;
+    // MU regime: B==0 is usually estimate lag on a saturated UE (see mu_force above), and
+    // sched_inactive would cap its grant at min_rb keepalive size — keep MU UEs full-band.
+    bool sched_inactive = B == 0 && do_sched && !(mu_regime && UE->ra == NULL);
     LOG_D(NR_MAC, "[UE %04x][%4d.%2d] b %d, ul_thr_ue %f, tbs %d, coeff_ue %f, sched_inactive %d\n",
           UE->rnti,
           frame,
@@ -2232,6 +2256,8 @@ static int  pf_ul(gNB_MAC_INST *nrmac,
     }
     else
       LOG_D(NR_MAC, "%4d.%2d free CCE for UL DCI UE %04x\n", frame, slot, iterator->UE->rnti);
+    printf("[ULDCI] %d.%d rnti %04x AL %d cce %d sched %d.%d\n",
+           frame, slot, iterator->UE->rnti, sched_ctrl->aggregation_level, CCEIndex, sched_frame, sched_slot);
 
     const int index = ul_buffer_index(sched_frame, sched_slot, slots_per_frame, nrmac->vrb_map_UL_size);
     uint16_t *rballoc_mask = &nrmac->common_channels[CC_id].vrb_map_UL[beam.idx][index * MAX_BWP_SIZE];
@@ -2298,6 +2324,9 @@ static int  pf_ul(gNB_MAC_INST *nrmac,
       sched_ctrl->ul_bler_stats.mcs = sched.mcs; /* force estimated MCS down */
 
     update_ul_ue_R_Qm(sched.mcs, current_BWP->mcs_table, current_BWP->pusch_Config, &sched.R, &sched.Qm);
+    // MU regime: a saturated UE's real buffer is never empty; only the estimate B lags
+    // (see mu_force above). Size the grant to the full available band, not the estimate.
+    const int B_sized = (mu_regime && iterator->UE->ra == NULL) ? (1 << 20) : B;
     if (!iterator->sched_inactive) {
       // this UE has data, find optimal number of RB for data and in range
       // [min_rb,available_rb]
@@ -2307,7 +2336,7 @@ static int  pf_ul(gNB_MAC_INST *nrmac,
                     sched.nrOfLayers,
                     sched.tda_info.nrOfSymbols,
                     sched.dmrs_info.N_PRB_DMRS * sched.dmrs_info.num_dmrs_symb,
-                    B,
+                    B_sized,
                     min_rb,
                     available_rb,
                     &sched.tb_size,
@@ -2475,7 +2504,7 @@ nfapi_nr_pusch_pdu_t *prepare_pusch_pdu(nfapi_nr_ul_tti_request_t *future_ul_tti
       // UEs on port 0 but give each a different DMRS scrambling (nSCID) -> quasi-orthogonal DMRS,
       // estimable without the port-1 antenna-ports DCI gap. OAI_UL_MU_SCID => use scid=port_index.
       static int use_scid = -1;
-      if (use_scid < 0) { const char *e = getenv("OAI_UL_MU_SCID"); use_scid = (e && e[0]) ? 1 : 0; }
+      if (use_scid < 0) { const char *e = getenv("OAI_UL_MU_SCID"); use_scid = (e && e[0]) ? atoi(e) : 0; }
       static int force_scid = -2;
       if (force_scid == -2) { const char *e = getenv("OAI_UL_MU_FORCE_SCID"); force_scid = (e && e[0]) ? atoi(e) : -1; }
       if (use_scid || force_scid >= 0) {
@@ -2499,7 +2528,7 @@ nfapi_nr_pusch_pdu_t *prepare_pusch_pdu(nfapi_nr_ul_tti_request_t *future_ul_tti
   {
     extern volatile int g_mu_mimo_active;
     static int mu_scid2 = -1;
-    if (mu_scid2 < 0) { const char *e = getenv("OAI_UL_MU_SCID"); mu_scid2 = (e && e[0]) ? 1 : 0; }
+    if (mu_scid2 < 0) { const char *e = getenv("OAI_UL_MU_SCID"); mu_scid2 = (e && e[0]) ? atoi(e) : 0; }
     if (mu_scid2 && g_mu_mimo_active && UE->ra == NULL && sched_pusch->nrOfLayers == 1) {
       static rnti_t scid_map[8] = {0};
       static int scid_cnt = 0;
@@ -2520,7 +2549,7 @@ nfapi_nr_pusch_pdu_t *prepare_pusch_pdu(nfapi_nr_ul_tti_request_t *future_ul_tti
   // (RA/Msg3 stays port 0). The UE side is forced via OAI_UE_FORCE_DMRS_PORT (it hardcodes port 0).
   {
     static int mu_ports = -1;
-    if (mu_ports < 0) { const char *e = getenv("OAI_UL_MU_PORTS"); mu_ports = (e && e[0]) ? 1 : 0; }
+    if (mu_ports < 0) { const char *e = getenv("OAI_UL_MU_PORTS"); mu_ports = (e && e[0]) ? atoi(e) : 0; }
     // STICKY trigger latch (same semantics as the UE's OAI_UE_FORCE_DMRS_PORT gate): the UE keeps
     // port 1 forever once the trigger file appears, so the gNB MUST too. Gating on g_mu_mimo_active
     // (dynamic) desyncs on any transient: gNB estimates port0 while UE1 still transmits port1 ->
@@ -2541,8 +2570,12 @@ nfapi_nr_pusch_pdu_t *prepare_pusch_pdu(nfapi_nr_ul_tti_request_t *future_ul_tti
       // OAI_UL_MU_PORT_FLIP: swap the port<->attach-order mapping — discriminator for whether the
       // one-sided round-0 failure follows the PORT (receiver defect) or the ATTACH ORDER (state bug)
       static int mu_pflip = -1;
-      if (mu_pflip < 0) { const char *e = getenv("OAI_UL_MU_PORT_FLIP"); mu_pflip = (e && e[0]) ? 1 : 0; }
-      pusch_pdu->dmrs_ports = 1 << ((idx + mu_pflip) % 2);  // default: UE0 -> port0 (0x1), UE1 -> port1 (0x2)
+      if (mu_pflip < 0) { const char *e = getenv("OAI_UL_MU_PORT_FLIP"); mu_pflip = (e && e[0]) ? atoi(e) : 0; }
+      // OAI_UL_MU_CDM: ports {0,2} = separate CDM groups (separate pilot combs, no shared OCC);
+      // default: ports {0,1} = FD-OCC within CDM group 0.
+      static int mu_cdm2 = -1;
+      if (mu_cdm2 < 0) { const char *e = getenv("OAI_UL_MU_CDM"); mu_cdm2 = (e && e[0]) ? atoi(e) : 0; }
+      pusch_pdu->dmrs_ports = 1 << ((mu_cdm2 ? 2 : 1) * ((idx + mu_pflip) % 2));  // {0,1} or {0,2}
       { static int pd = 0; if (pd++ < 8)
           LOG_E(NR_MAC, "[MU PORT] rnti=%04x idx=%d dmrs_ports=0x%x\n", rnti, idx, pusch_pdu->dmrs_ports); }
     }

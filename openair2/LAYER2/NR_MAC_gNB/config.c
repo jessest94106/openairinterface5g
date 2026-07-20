@@ -677,7 +677,7 @@ static void config_common(gNB_MAC_INST *nrmac, const nr_mac_config_t *config, NR
 
   int pusch_AntennaPorts = config->pusch_AntennaPorts;
   cfg->carrier_config.num_rx_ant.value = pusch_AntennaPorts;
-  AssertFatal(pusch_AntennaPorts > 0 && pusch_AntennaPorts < 13, "pusch_AntennaPorts in 1...12\n");
+  AssertFatal(pusch_AntennaPorts > 0 && pusch_AntennaPorts < 17, "pusch_AntennaPorts in 1...16\n");
   cfg->carrier_config.num_rx_ant.tl.tag = NFAPI_NR_CONFIG_NUM_RX_ANT_TAG;
   LOG_I(NR_MAC,
         "Set TX antenna number to %d, Set RX antenna number to %d (num ssb %d: %x,%x)\n",

@@ -747,6 +747,17 @@ NR_pusch_dmrs_t get_ul_dmrs_params(const NR_ServingCellConfigCommon_t *scc,
     dmrs.num_dmrs_cdm_grps_no_data = ul_bwp->dci_format == NR_UL_DCI_FORMAT_0_1 || tda_info->nrOfSymbols <= 2 ? 1 : 2;
   else
     dmrs.num_dmrs_cdm_grps_no_data = 2;
+  // OAI_UL_MU_CDM: give co-scheduled UEs separate CDM groups (ports 0/2) instead of FD-OCC
+  // ports 0/1 in one group — pilot combs no longer shared, so no decover cross-talk at any
+  // delay spread. Costs the data REs on the other comb of DMRS symbols (138->120 RE/PRB).
+  // Forced here (the dmrs_info source) so TBS, N_PRB_DMRS and the PUSCH PDU stay consistent;
+  // the DCI antenna_ports encode/decode (38.212 T7.3.1.1.2-8) carries it to the UE natively.
+  {
+    static int mu_cdm = -1;
+    if (mu_cdm < 0) { const char *e = getenv("OAI_UL_MU_CDM"); mu_cdm = (e && e[0]) ? 1 : 0; }
+    if (mu_cdm && ul_bwp->dci_format == NR_UL_DCI_FORMAT_0_1)
+      dmrs.num_dmrs_cdm_grps_no_data = 2;
+  }
 
   const NR_DMRS_UplinkConfig_t *NR_DMRS_UplinkConfig = get_DMRS_UplinkConfig(ul_bwp->pusch_Config, tda_info);
   dmrs.ptrsConfig = NR_DMRS_UplinkConfig
@@ -1255,6 +1266,19 @@ void config_uldci(const NR_UE_ServingCell_Info_t *sc_info,
         int mu_port = 0;
         for (int b = 0; b < 4; b++) if (pusch_pdu->dmrs_ports & (1 << b)) { mu_port = b; break; }
         dci_pdu_rel15->antenna_ports.val = 2 * (pusch_pdu->num_dmrs_cdm_grps_no_data - 1) + mu_port;
+        // VALPROBE: a val>=2 with cdmg==1 means the PDU carried port-index>=2 — outside the
+        // 38.212 Table 7.3.1.1.2-8 domain for 1 CDM group; the UE will read it as cdmg=2 and
+        // encode a mismatched TB (the all-round CRC chain family). Print the emitter fingerprint.
+        {
+          static int valprobe_cnt = 0;
+          if (dci_pdu_rel15->antenna_ports.val >= 2 && valprobe_cnt < 200) {
+            printf("[VALPROBE] rnti %04x val %d dmrs_ports 0x%x cdmg %d rv %d ndi %d mcs %d\n",
+                   pusch_pdu->rnti, dci_pdu_rel15->antenna_ports.val, pusch_pdu->dmrs_ports,
+                   pusch_pdu->num_dmrs_cdm_grps_no_data, pusch_pdu->pusch_data.rv_index,
+                   pusch_pdu->pusch_data.new_data_indicator, pusch_pdu->mcs_index);
+            valprobe_cnt++;
+          }
+        }
       } else {
         dci_pdu_rel15->antenna_ports.val = 0; // multi-layer mapping not implemented (unchanged)
       }

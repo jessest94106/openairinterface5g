@@ -48,6 +48,7 @@ void free_nr_prach_entry(prach_list_t *l, prach_item_t *p)
   pthread_mutex_lock(&l->prach_list_mutex);
   if (p->frame == -1)
     LOG_E(NR_PHY_RACH, "Freeing a not allocated prach entry\n");
+  printf("[PRACHPAIR FREE] f=%d s=%d item=%p\n", p->frame, p->slot, (void *)p);
   *p = (prach_item_t){.frame = -1, .slot = -1, .num_slots = -1};
   pthread_mutex_unlock(&l->prach_list_mutex);
 }
@@ -122,6 +123,7 @@ prach_item_t *nr_schedule_rx_prach(PHY_VARS_gNB *gNB, int SFN, int Slot, nfapi_n
   prach->nb_rx = gNB->gNB_config.carrier_config.num_rx_ant.value;
   prach->Xu = gNB->X_u;
   prach->rx_prach = &gNB->rx_prach;
+  printf("[PRACHPAIR CREATE] f=%d s=%d item=%p\n", SFN, Slot, (void *)prach);
   return prach;
 }
 
@@ -488,6 +490,26 @@ rx_prach_out_t rx_nr_prach(const prach_item_t *in, int occasion)
   }
   const int pre_lo = (only_pre >= 0) ? only_pre : 0;
   const int pre_hi = (only_pre >= 0) ? only_pre + 1 : 64;
+  {
+    // PRACHPAIR probe: what the detector actually sees in rxsigF, paired with the fill-side
+    // [gNB PRACH RX] logs (same item pointer) to split fill-vs-detect data loss per occasion.
+    static int pairlog_count = 0;
+    long asum[NB_ANTENNAS_RX];
+    int nz_ants = 0;
+    for (int aa = 0; aa < nb_rx && aa < NB_ANTENNAS_RX; aa++) {
+      const int16_t *r = (const int16_t *)in->rxsigF[occasion][aa];
+      long s = 0;
+      for (int k = 0; k < 139 * 2; k++)
+        s += (r[k] < 0) ? -r[k] : r[k];
+      asum[aa] = s;
+      if (s > 0)
+        nz_ants++;
+    }
+    (void)pairlog_count;
+    printf("[PRACHPAIR DET] f=%d s=%d occ=%d item=%p nb_rx=%d nz_ants=%d E0=%ld E1=%ld E8=%ld E15=%ld\n",
+           in->frame, in->slot, occasion, (const void *)in, nb_rx, nz_ants,
+           asum[0], nb_rx > 1 ? asum[1] : -1, nb_rx > 8 ? asum[8] : -1, nb_rx > 15 ? asum[15] : -1);
+  }
   for (int preamble_index = pre_lo; preamble_index < pre_hi; preamble_index++) {
     if (LOG_DEBUGFLAG(DEBUG_PRACH)) {
       int en = dB_fixed(signal_energy((int32_t *)in->rxsigF[occasion][0], N_ZC == 839 ? 840 : 140));

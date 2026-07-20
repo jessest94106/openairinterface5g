@@ -1120,6 +1120,14 @@ void nr_rrc_config_ul_tda(NR_ServingCellConfigCommon_t *scc, int min_fb_delay, i
 
   // UL TDA index 0 is basic slot configuration starting in symbol 0 til the last but one symbol
   NR_PUSCH_TimeDomainResourceAllocation_t *tda;
+  // OAI_UL_TDA14: also offer full-14-symbol allocations (typeB S=0 L=14, 38.214 Table 6.1.2.1-1).
+  // The scheduler picks them only where no PUCCH/PRACH occupies symbol 13 (get_best_ul_tda).
+  const char *tda14_env = getenv("OAI_UL_TDA14");
+  const bool tda14 = tda14_env && atoi(tda14_env);
+  if (tda14) {
+    tda = set_TimeDomainResourceAllocation(k2, get_SLIV(0, 14));
+    asn1cSeqAdd(&tda_list->list, tda);
+  }
   tda = set_TimeDomainResourceAllocation(k2, get_SLIV(0, 13));
   asn1cSeqAdd(&tda_list->list, tda);
 
@@ -1169,6 +1177,21 @@ void nr_rrc_config_ul_tda(NR_ServingCellConfigCommon_t *scc, int min_fb_delay, i
       LOG_I(NR_RRC, "mixed slot has %d UL symbols, cannot create mixed slot TDA\n", ul_symb);
     }
 
+    const char *mixed_tda_env = getenv("OAI_UL_MIXED_TDA");
+    if (has_ul_mixed && !p2 && mixed_tda_env && atoi(mixed_tda_env)) {
+      // The mixed TDA above is unreachable when its k2 < min_fb_delay (the scheduler cursor
+      // clamps to current+min_fb_delay), which also aborts every pure-DL slot's scheduling
+      // walk at the next mixed slot (exact-k2 match required). Add a mixed TDA whose k2 maps
+      // the last full-DL slot of a period onto the next period's mixed slot: smallest
+      // k2 >= min_fb_delay with k2 % nb_slots_per_period == 1.
+      int k2_mixed = 1 + ((min_fb_delay + nb_slots_per_period - 2) / nb_slots_per_period) * nb_slots_per_period;
+      if (k2_mixed != nb_slots_per_period && k2_mixed <= k2 + N_ul1) {
+        tda = set_TimeDomainResourceAllocation(k2_mixed, mixed_sliv);
+        asn1cSeqAdd(&tda_list->list, tda);
+        LOG_I(NR_RRC, "added mixed-slot UL TDA k2 %d for DL-slot reachability\n", k2_mixed);
+      }
+    }
+
     // make TDA for UL slots that are not reachable within k2/min_rxtxtime
     int N_ul = max(N_ul1, N_ul2);
     if (N_ul > k2) {
@@ -1190,6 +1213,10 @@ void nr_rrc_config_ul_tda(NR_ServingCellConfigCommon_t *scc, int min_fb_delay, i
       // k2+1..k2+N_ul so each full UL slot of the next period has a matching k2 and
       // all N_ul UL slots can be granted per period.
       for (int i = k2 + 1; i <= k2 + N_ul; ++i) {
+        if (tda14) {
+          tda = set_TimeDomainResourceAllocation(i, get_SLIV(0, 14));
+          asn1cSeqAdd(&tda_list->list, tda);
+        }
         tda = set_TimeDomainResourceAllocation(i, get_SLIV(0, 13));
         asn1cSeqAdd(&tda_list->list, tda);
         if (do_SRS) {
@@ -1632,6 +1659,22 @@ static NR_SetupRelease_PUSCH_Config_t *config_pusch(const nr_mac_config_t *confi
   }
   NR_DMRS_UplinkConfig->dmrs_Type = NULL;
   NR_DMRS_UplinkConfig->dmrs_AdditionalPosition = NULL;
+  {
+    // OAI_UL_DMRS_ADDPOS: 0/1/3 -> signal pos0/pos1/pos3; unset -> absent = pos2 default (38.331)
+    const char *e = getenv("OAI_UL_DMRS_ADDPOS");
+    if (e && e[0]) {
+      long v = -1;
+      switch (atoi(e)) {
+        case 0: v = NR_DMRS_UplinkConfig__dmrs_AdditionalPosition_pos0; break;
+        case 1: v = NR_DMRS_UplinkConfig__dmrs_AdditionalPosition_pos1; break;
+        case 3: v = NR_DMRS_UplinkConfig__dmrs_AdditionalPosition_pos3; break;
+      }
+      if (v >= 0) {
+        asn1cCallocOne(NR_DMRS_UplinkConfig->dmrs_AdditionalPosition, v);
+        LOG_I(NR_MAC, "UL DMRS additionalPosition overridden to pos%s\n", e);
+      }
+    }
+  }
   NR_DMRS_UplinkConfig->phaseTrackingRS = NULL;
   NR_DMRS_UplinkConfig->maxLength = NULL;
   if (!NR_DMRS_UplinkConfig->transformPrecodingDisabled)

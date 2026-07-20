@@ -839,6 +839,16 @@ int nr_config_pusch_pdu(NR_UE_MAC_INST_t *mac,
                                                           pusch_config_pdu->nrOfLayers) >> 3;
     mac->ul_harq_info[pid].TBS = pusch_config_pdu->pusch_data.tb_size;
     mac->ul_harq_info[pid].R = R;
+    // UETBS probe: UE-side TBS view, to diff against gNB DECPARAM (TBS-view-mismatch hunt)
+    {
+      static int uetbs_cnt = 0;
+      if (uetbs_cnt < 300 || (uetbs_cnt % 37) == 0)
+        printf("[UETBS] hpid %d TBS %d mcs %d Qm %d cdmg %d dmrssym %d rb %d port %d\n",
+               pid, pusch_config_pdu->pusch_data.tb_size, pusch_config_pdu->mcs_index,
+               pusch_config_pdu->qam_mod_order, pusch_config_pdu->num_dmrs_cdm_grps_no_data,
+               number_dmrs_symbols, pusch_config_pdu->rb_size, pusch_config_pdu->dmrs_ports);
+      uetbs_cnt++;
+    }
   } else {
     pusch_config_pdu->target_code_rate = mac->ul_harq_info[pid].R;
     pusch_config_pdu->pusch_data.tb_size = mac->ul_harq_info[pid].TBS;

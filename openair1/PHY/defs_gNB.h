@@ -155,6 +155,10 @@ typedef struct {
   /// Last index of LLR buffer that contains information.
   /// Used for computing LDPC decoder R
   int llrLen;
+  /// per-TB synchronous forensics captured at decode dispatch (indication-time reads of
+  /// pusch_vars are async-stale — a later slot may have rewritten them)
+  int dbg_log2h;
+  int dbg_llr;
   //////////////////////////////////////////////////////////////
 } NR_UL_gNB_HARQ_t;
 
@@ -241,14 +245,18 @@ typedef struct {
   int16_t log2_maxh;
   /// MU two-phase: chest already done for this slot (phase 1); decode phase reuses stored results
   int mu_chest_done;
+  /// slot-stamp of the hoisted chest — partner estimates are only valid when stamped with the
+  /// decoding slot (a stale full-strength estimate passes energy checks and poisons the MMSE)
+  int mu_chest_frame;
+  int mu_chest_slot;
   int mu_max_ch;
   uint32_t mu_nvar;
   /// measured RX power based on DRS
-  uint32_t ulsch_power[8];
+  uint32_t ulsch_power[MAX_ANT];
   /// total signal over antennas
   uint32_t ulsch_power_tot;
   /// measured RX noise power
-  uint32_t ulsch_noise_power[8];
+  uint32_t ulsch_noise_power[MAX_ANT];
   /// total noise over antennas
   uint32_t ulsch_noise_power_tot;
   /// \brief llr values.
@@ -271,6 +279,18 @@ typedef struct {
   int llr_offset[14];
   /// flag to indicate DTX on reception
   int DTX;
+  /// mid-slot (symbol 6) mean |LLR| of the last processed TB — failing-TB forensics via FAILCLASS
+  int32_t last_llr_mean;
+  /// closed-loop LLR-scale servo (MU path): extra right-shift so the demapper output stays in the
+  /// LDPC-workable window across Qm and channel-scale draws (the open-loop log2_maxh scheme's
+  /// output tracks sqrt(channel power) and its per-Qm windows are narrow)
+  int mu_llr_shift_srv;
+  /// per-slot scratch for nr_rx_pusch_tp; heap-allocated at init because as stack VLAs
+  /// (nb_layer/nb_rx_ant * rb_size-scaled) they exceed the default 8MB thread stack at 16RX x 273PRB
+  c16_t *dmrs_slot_scratch; // max_ul_mimo_layers * N_RB_UL*12*14
+  c16_t *chest_dmrs_pos_scratch; // N_RB_UL*12*14 * max_ul_mimo_layers * nb_rx
+  c16_t *chest_interpl_scratch; // N_RB_UL*12*14 * max_ul_mimo_layers * nb_rx
+  c16_t *rxFext_slot_scratch; // nb_rx * N_RB_UL*12*14
 } NR_gNB_PUSCH;
 
 /// Context data structure for RX/TX portion of slot processing
