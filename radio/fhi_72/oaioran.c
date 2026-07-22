@@ -119,11 +119,36 @@ void oai_xran_fh_rx_callback(void *pCallbackTag, xran_status_t status)
           // callback, so (tti+1)'s syms 0-8 were cleared after landing — leaving
           // only the last ~5 symbols (mask=...011111) and forcing every UL TB to
           // need 3 HARQ rounds. With N=20, (tti+10) is clear long before its slot.
-          uint32_t next_buf = (tti + (XRAN_N_FE_BUF_LEN / 2)) % XRAN_N_FE_BUF_LEN;
+          // Reset offset: must land AFTER the buffer's last read (slot B-20, read ~3 slots
+          // after its slot) and BEFORE its next fill. The non-realtime vrtsim RU streams UL
+          // up to ~10 slots AHEAD of this callback clock (lead is width-dependent: the slow
+          // BFP-compress path at iq<=10 delayed emission below the boundary; raw/wide paths
+          // don't), so the old N/2 (+10) offset swept buffers WHILE their 2-fragment deposit
+          // trains were landing: pair-complete-then-cleared -> whole-symbol loss, mid-pair ->
+          // one fragment randomly wiped (50/50) -> DMRS chest collapse (log2h 4) -> LDPC
+          // abort chains -> the iq_width>=12 throughput crater. +14 keeps 3-4 slots of read
+          // margin and tolerates a streaming lead up to 14 slots. [RSTLIVE] counts residual
+          // collisions (expect 0). Env-tunable for experiments.
+          static int rst_off = -1;
+          if (rst_off < 0) {
+            const char *e_ro = getenv("OAI_FH_RESET_OFFSET");
+            rst_off = (e_ro && e_ro[0]) ? atoi(e_ro) : (XRAN_N_FE_BUF_LEN - 6);
+          }
+          uint32_t next_buf = (tti + rst_off) % XRAN_N_FE_BUF_LEN;
           struct xran_prb_map *pNextRbMap = (struct xran_prb_map *)bufs->dstcp[ant_id][next_buf].pBuffers->pData;
           if (pNextRbMap != NULL) {
             for (uint32_t sym_id = 0; sym_id < XRAN_NUM_OF_SYMBOL_PER_SLOT; sym_id++) {
               for (uint32_t idxElm = 0; idxElm < pNextRbMap->nPrbElm; idxElm++) {
+                // Investigation probe: nSecDesc==1 here = we are clearing MID-PAIR (a
+                // fragment train is depositing into this buffer RIGHT NOW) = collision.
+                uint16_t ns_at_reset = pNextRbMap->prbMap[idxElm].nSecDesc[sym_id];
+                if (ns_at_reset == 1) {
+                  static _Atomic long rst_midpair = 0;
+                  long c = ++rst_midpair;
+                  if (c <= 8 || (c % 500) == 0)
+                    printf("[RSTLIVE] mid-pair clear #%ld cb_tti %u target_buf %u ant %u sym %u\n",
+                           c, tti, next_buf, ant_id, sym_id);
+                }
                 pNextRbMap->prbMap[idxElm].nSecDesc[sym_id] = 0;
               }
             }
@@ -708,7 +733,40 @@ int xran_fh_rx_read_slot(ru_info_t *ru, int *frame, int *slot)
                 }
                 if (pRbElm->nSecDesc[sym_idx] == 0)
                   continue;
-              } else if (idxDesc >= (int)pRbElm->nSecDesc[sym_idx]) {
+              }
+              // Hardware-RU emulation (OAI_FH_EXPECT_FRAGS=N, default off): a real O-RU emits a
+              // symbol's fragments back-to-back with deterministic timing, so the consumer only
+              // ever sees complete symbols. Emulate that by waiting for ALL N expected sections
+              // (not just the first) before reading — affordable because wall-time budgets are
+              // 1/TS dilated relative to the sim-time deadline the spec actually defines.
+              // Verdict counters distinguish late-but-arrives (recoverable) from upstream-dropped.
+              {
+                static int exp_frags = -1;
+                if (exp_frags < 0) { const char *e_ef = getenv("OAI_FH_EXPECT_FRAGS"); exp_frags = (e_ef && e_ef[0]) ? atoi(e_ef) : 0; }
+                if (exp_frags > 1 && idxDesc == 0 && pRbElm->nSecDesc[sym_idx] > 0
+                    && pRbElm->nSecDesc[sym_idx] < exp_frags) {
+                  static int fw_cap = 0;
+                  if (fw_cap == 0) { const char *e_sc = getenv("OAI_FH_SPIN_CAP"); fw_cap = (e_sc && atoi(e_sc) > 0) ? atoi(e_sc) : 300000; }
+                  volatile uint16_t *ns2 = (volatile uint16_t *)&pRbElm->nSecDesc[sym_idx];
+                  int w2 = 0;
+                  for (; w2 < fw_cap && *ns2 < exp_frags; w2++)
+                    __asm__ volatile("pause" ::: "memory");
+                  static long fw_ok = 0, fw_to = 0, fw_have_f1 = 0, fw_have_f2 = 0;
+                  if (*ns2 >= exp_frags) {
+                    fw_ok++;
+                  } else {
+                    fw_to++;
+                    // Which fragment survived? start_prbu 0 = frag1 (late-arrival story),
+                    // nonzero = frag2 (stale-generation story).
+                    if (pRbElm->sec_desc[sym_idx][0].start_prbu == 0) fw_have_f1++; else fw_have_f2++;
+                  }
+                  long fw_tot = fw_ok + fw_to;
+                  if (fw_tot <= 8 || (fw_tot % 2000) == 0)
+                    printf("[FRAGWAIT] complete %ld timeout %ld (have_f1 %ld have_f2 %ld) f=%d s=%d sym=%d ant=%d\n",
+                           fw_ok, fw_to, fw_have_f1, fw_have_f2, *frame, *slot, sym_idx, ant_id);
+                }
+              }
+              if (idxDesc >= (int)pRbElm->nSecDesc[sym_idx]) {
                 // Fragment not received this frame or sym arrived early and is
                 // already counted — skip stale sec_desc entries.
                 continue;
@@ -901,6 +959,18 @@ int xran_fh_rx_read_slot(ru_info_t *ru, int *frame, int *slot)
                 exit(-1);
               }
               if ((startRB + numRB) == (start_totalRB + num_totalRB)) {
+                // Scale probe: delivered amplitude of the decoded symbol (first 256 int16
+                // = low PRBs). Compares raw-vs-BFP path output scale across iq widths.
+                {
+                  static _Atomic long crms_n = 0;
+                  if (ant_id == 0 && (++crms_n % 2048) == 1) {
+                    long acc = 0;
+                    const int16_t *p16 = (const int16_t *)local_dst;
+                    for (int s = 0; s < 256; s++)
+                      acc += p16[s] < 0 ? -p16[s] : p16[s];
+                    printf("[CONSRMS] f=%d s=%d sym=%d absmean256 %ld\n", *frame, *slot, sym_idx, acc / 256);
+                  }
+                }
                 int pos_len = 0;
                 int neg_len = 0;
 
@@ -951,6 +1021,15 @@ int xran_fh_rx_read_slot(ru_info_t *ru, int *frame, int *slot)
             tx_pps,
             tx_kbps,
             x_counters[o_xu_id].Total_msgs_rcvd);
+      LOG_I(HW,
+            "[FH RXCLS][o-du %d] dupl %ld srs %ld ontime %ld early %ld late %ld corrupt %ld\n",
+            o_xu_id,
+            (long)x_counters[o_xu_id].Rx_pkt_dupl,
+            (long)x_counters[o_xu_id].rx_srs_packets,
+            (long)x_counters[o_xu_id].Rx_on_time,
+            (long)x_counters[o_xu_id].Rx_early,
+            (long)x_counters[o_xu_id].Rx_late,
+            (long)x_counters[o_xu_id].Rx_corrupt);
       LOG_I(HW,
             "[FH LOAD][o-du %d] rx=%ld.%03ld Mbps tx=%ld.%03ld Mbps total=%ld.%03ld Mbps rx_pps=%ld tx_pps=%ld total_pps=%ld\n",
             o_xu_id,

@@ -867,7 +867,10 @@ static bool set_fh_ru_config(void *mplane_api, const paramdef_t *rup, uint16_t f
   //ru_config->compMeth = ru_config->iqWidth < 16 ? XRAN_COMPMETHOD_BLKFLOAT : XRAN_COMPMETHOD_NONE; // compression method
   //ru_config->compMeth_PRACH = ru_config->iqWidth_PRACH < 16 ? XRAN_COMPMETHOD_BLKFLOAT : XRAN_COMPMETHOD_NONE; // compression method for PRACH
   ru_config->compMeth = *gpd(rup, nru, ORAN_RU_CONFIG_COMPMETH)->u8ptr;
-  if (ru_config->iqWidth == 16)
+  // O-RAN udIqWidth encodes 16 as 0, and BFP-16 (mantissa 16 + exponent, 49 B/PRB) is
+  // legal on the wire; our codec is width-generic. Keep the historical force-to-NONE
+  // default but allow true BFP-16 via OAI_ALLOW_BFP16=1 (both DU and RU must set it).
+  if (ru_config->iqWidth == 16 && !(getenv("OAI_ALLOW_BFP16") && atoi(getenv("OAI_ALLOW_BFP16"))))
       ru_config->compMeth = XRAN_COMPMETHOD_NONE;
   else{
       switch(ru_config->compMeth) {

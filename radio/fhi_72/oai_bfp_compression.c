@@ -41,7 +41,11 @@ static uint32_t bfp_block_bytes(uint32_t iq_width, uint32_t num_data_elements)
 
 static int valid_iq_width(uint32_t iq_width)
 {
-  return iq_width == 8 || iq_width == 9 || iq_width == 10 || iq_width == 12 || iq_width == 14 || iq_width == 16;
+  /* O-RAN CUS-plane udIqWidth is a 4-bit field where 0 encodes 16, so widths 1..16 are all
+   * legal on the wire, and the pack/unpack loops here are width-generic (no per-width paths).
+   * Upstream listed only the commonly deployed subset {8,9,10,12,14,16}; the full range is
+   * needed to characterise quantisation noise vs throughput below 8 bits. */
+  return iq_width >= 1 && iq_width <= 16;
 }
 
 void oai_bfp_compression_n(uint32_t iq_width, uint32_t n_blocks, uint32_t num_data_elements, const int16_t *src, int8_t *dst)

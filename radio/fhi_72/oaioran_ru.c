@@ -460,6 +460,20 @@ int xran_oru_tx_read_slot(uint32_t **txdataF, int nb_tx, int *frame, int *slot, 
     uplane_data_t *uplane_data[MAX_UPLANE_PACKETS_PER_SYMBOL];
     int num_packets = pull_uplane_packet_data(&packet_processor_context, uplane_data, MAX_UPLANE_PACKETS_PER_SYMBOL, *slot, sym);
     total_symbols_processed++;
+    // Investigation probe: sections found per DL symbol pull. Expected per symbol =
+    // nb_tx x n_frag (2 at iq<=10, 4 at iq>=12). Fewer -> partial symbol assembly.
+    {
+      static _Atomic long dl_pull_hist[6];
+      static _Atomic long dl_pull_np = 0;
+      int b = num_packets > 5 ? 5 : num_packets;
+      dl_pull_hist[b]++;
+      long np_now = num_packets > 0 ? ++dl_pull_np : dl_pull_np;
+      if (num_packets > 0 && (np_now <= 5 || (np_now % 2000) == 0))
+        printf("[DLPULL] nonzero %ld hist 0:%ld 1:%ld 2:%ld 3:%ld 4:%ld 5+:%ld stale %ld late %ld\n",
+               (long)dl_pull_np, (long)dl_pull_hist[0], (long)dl_pull_hist[1], (long)dl_pull_hist[2],
+               (long)dl_pull_hist[3], (long)dl_pull_hist[4], (long)dl_pull_hist[5],
+               (long)packet_processor_context.up_not_processed, (long)packet_processor_context.up_late);
+    }
     if (num_packets) {
       symbols_with_packets++;
       if (symbols_with_packets <= 10 || symbols_with_packets % 100 == 0) {
@@ -634,6 +648,10 @@ int process_ru_uplane(struct rte_mbuf *pkt,
     packet_processor_context.up_dropped++;
     return MBUF_FREE;
   }
+  // O-RAN udIqWidth is 4-bit: 16 is encoded as 0 on the wire (XRAN_CONVERT_IQWIDTH).
+  // The parser stores it verbatim, so map it back or BFP-16 DL decompresses with width 0.
+  if (compMeth != XRAN_COMPMETHOD_NONE && iqWidth == 0)
+    iqWidth = 16;
   LOG_D(HW,
         "ORAN: U-plane packet received. CC_ID %d, Ant_ID %d, frame_id %d, subframe_id %d, slot_id %d, symb_id %d, filter_id %d, "
         "num_prbu %d, start_prbu %d, sym_inc %d, rb %d, sect_id %d, compMeth %d, iqWidth %d, is_prach %d\n",
@@ -1460,6 +1478,24 @@ void xran_oru_send_pusch(uint32_t *puschF, int aarx, int frame, int slot, int sy
     if (max_prb_per_frag > 255) max_prb_per_frag = 255; /* numPrbu <=255 (0=all) */
     if (max_prb_per_frag < 1)   max_prb_per_frag = 1;
     int n_frag = (num_prb + max_prb_per_frag - 1) / max_prb_per_frag;
+    // Investigation probe: frag branch execution + UL emission lead vs the RU's OTA clock.
+    // lead = how many slots AHEAD of on-air time this symbol's U-plane leaves the RU
+    // (mod 20; the DU-side ring reset offset must exceed the max lead).
+    {
+      extern uint32_t xran_lib_ota_tti[];
+      static _Atomic long txp_n1 = 0, txp_n2 = 0;
+      static _Atomic int lead_min = 99, lead_max = -99;
+      int ota_slot = (int)(xran_lib_ota_tti[0] % 20);
+      int lead = (slot - ota_slot + 20) % 20;
+      if (lead < lead_min) lead_min = lead;
+      if (lead > lead_max) lead_max = lead;
+      if (n_frag > 1) txp_n2++; else txp_n1++;
+      long tot = txp_n1 + txp_n2;
+      if (tot <= 4 || (tot % 100000) == 0)
+        printf("[ORU TXFRAG] single %ld multi %ld (num_prb %d bytes_per_prb %zu comp %d n_frag %d) lead now %d min %d max %d\n",
+               (long)txp_n1, (long)txp_n2, num_prb, bytes_per_prb, use_comp_hdr, n_frag,
+               lead, (int)lead_min, (int)lead_max);
+    }
     if (n_frag > 1) {
       int fftsize = 1 << fh_cfg->nULFftSize;
       /* reorder the whole symbol into host-order linear-PRB local_src (DC-uncentered) */
