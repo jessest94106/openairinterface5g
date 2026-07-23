@@ -720,21 +720,29 @@ static uint8_t nr_ulsch_mmse_2layers(int **rxdataF_comp,
    *   af_mf_XY[re] = sum_a conj(H[a][X]) * H[a][Y]   (saturating int16 accumulation)
    * Generic over antenna count — replaces the hand-unrolled nb_rx_ant==2/4 switch, which
    * returned -1 for 8/16 and blocked the antenna ladder. */
-  c16_t hh_prod[12 * nb_rb] __attribute__((aligned(32)));
-  memset(af_mf_00, 0, 12 * nb_rb * sizeof(c16_t));
-  memset(af_mf_01, 0, 12 * nb_rb * sizeof(c16_t));
-  memset(af_mf_10, 0, 12 * nb_rb * sizeof(c16_t));
-  memset(af_mf_11, 0, 12 * nb_rb * sizeof(c16_t));
-  for (int aa = 0; aa < nb_rx_ant; aa++) {
-    c16_t *h0 = ul_ch_estimates_ext[0][aa];
-    c16_t *h1 = ul_ch_estimates_ext[1][aa];
-    c16_t *const pairs[4][3] = {{h0, h0, af_mf_00}, {h0, h1, af_mf_01}, {h1, h0, af_mf_10}, {h1, h1, af_mf_11}};
-    for (int e = 0; e < 4; e++) {
-      nr_ulsch_conjch0_mult_ch1(pairs[e][0], pairs[e][1], hh_prod, nb_rb_0, shift);
-      simde__m128i *dst = (simde__m128i *)pairs[e][2];
-      const simde__m128i *src = (const simde__m128i *)hh_prod;
-      for (uint32_t k = 0; k < 3 * nb_rb_0; k++)
-        dst[k] = simde_mm_adds_epi16(dst[k], src[k]);
+  // Wide-accumulator Gram matrix H^H*H: sum each conj-product across all antennas in int32
+  // lanes, apply one rounded shift after the full sum, saturating pack to int16. The old path
+  // (mult_cpx_conj_vector per antenna -> per-antenna shift, then saturating int16 adds_epi16)
+  // lost low-order bits and could wrap at 16 antennas, detuning the 2x2 inversion -> the
+  // joint-kernel MCS ceiling. Same fix as the single-stream MRC accumulator. Replicates
+  // oai_mm_cpx_mult_conj's two madd ops (re=madd(a,b), im=madd(swap(conj(a)),b)) exactly.
+  c16_t *const afmf[4] = {af_mf_00, af_mf_01, af_mf_10, af_mf_11};
+  const simde__m128i roundv = simde_mm_set1_epi32(shift > 0 ? 1 << (shift - 1) : 0);
+  for (int e = 0; e < 4; e++) {
+    const int lx = e >> 1, ly = e & 1; // entries (0,0)(0,1)(1,0)(1,1)
+    simde__m128i *dst = (simde__m128i *)afmf[e];
+    for (uint32_t k = 0; k < 3 * nb_rb_0; k++) {
+      simde__m128i acc_re = simde_mm_setzero_si128();
+      simde__m128i acc_im = simde_mm_setzero_si128();
+      for (int aa = 0; aa < nb_rx_ant; aa++) {
+        const simde__m128i a = ((simde__m128i *)ul_ch_estimates_ext[lx][aa])[k];
+        const simde__m128i b = ((simde__m128i *)ul_ch_estimates_ext[ly][aa])[k];
+        acc_re = simde_mm_add_epi32(acc_re, simde_mm_madd_epi16(a, b));
+        acc_im = simde_mm_add_epi32(acc_im, simde_mm_madd_epi16(oai_mm_swap(oai_mm_conj(a)), b));
+      }
+      acc_re = simde_mm_srai_epi32(simde_mm_add_epi32(acc_re, roundv), shift);
+      acc_im = simde_mm_srai_epi32(simde_mm_add_epi32(acc_im, roundv), shift);
+      dst[k] = oai_mm_pack(acc_re, acc_im);
     }
   }
 
