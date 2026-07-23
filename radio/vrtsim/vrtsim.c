@@ -1705,9 +1705,25 @@ static int vrtsim_read(openair0_device_t *device, openair0_timestamp_t *ptimesta
                        ue_e_acc[1] / (ue_n_acc[1] ? ue_n_acc[1] : 1));
             }
             int16_t *out = (int16_t *)samplesVoid[a];
-            for (int i = 0; i < nsamps * 2; i++) {
-              int32_t sum = (int32_t)out[i] + (int32_t)in[i];
-              out[i] = (int16_t)((sum > 32767) ? 32767 : (sum < -32768) ? -32768 : sum);
+            // MU steering under chanmod: the client's per-antenna TDL realizations are near-identical
+            // across antennas AND UEs (shared descriptors, DS~0) -> rank-1, corr2pct~99, MU
+            // unseparable. Compose the per-(UE,antenna) steering weight here (same rotation as the
+            // no-chanmod combine branch) so each UE gets its configured spatial signature.
+            if (vrtsim_state->ul_mu_steer && vrtsim_state->ul_mu_steer_active) {
+              const c16_t w = vrtsim_state->ul_mu_w[u][a];
+              for (int i = 0; i < nsamps; i++) {
+                int32_t sr = (int32_t)in[2 * i], si = (int32_t)in[2 * i + 1];
+                int32_t pr = (sr * w.r - si * w.i) >> 15;
+                int32_t pi = (sr * w.i + si * w.r) >> 15;
+                int32_t or_ = (int32_t)out[2 * i] + pr, oi = (int32_t)out[2 * i + 1] + pi;
+                out[2 * i]     = (int16_t)((or_ > 32767) ? 32767 : (or_ < -32768) ? -32768 : or_);
+                out[2 * i + 1] = (int16_t)((oi > 32767) ? 32767 : (oi < -32768) ? -32768 : oi);
+              }
+            } else {
+              for (int i = 0; i < nsamps * 2; i++) {
+                int32_t sum = (int32_t)out[i] + (int32_t)in[i];
+                out[i] = (int16_t)((sum > 32767) ? 32767 : (sum < -32768) ? -32768 : sum);
+              }
             }
           }
         }

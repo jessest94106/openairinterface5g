@@ -424,32 +424,46 @@ static void nr_ulsch_channel_compensation(uint32_t buffer_length,
     simde__m256i *rxF_ch_maga_256 = (simde__m256i *)ul_ch_maga[aatx];
     simde__m256i *rxF_ch_magb_256 = (simde__m256i *)ul_ch_magb[aatx];
     simde__m256i *rxF_ch_magc_256 = (simde__m256i *)ul_ch_magc[aatx];
-    for (int aarx = 0; aarx < nb_rx_ant; aarx++) {
-      simde__m256i *rxF_256 = (simde__m256i *)rxFext[aarx];
-      simde__m256i *chF_256 = (simde__m256i *)chFext[aatx][aarx];
-
-      for (int i = 0; i < buffer_length >> 3; i++) 
-      {
-        // MRC        
-        simde__m256i comp = oai_mm256_cpx_mult_conj(chF_256[i], rxF_256[i], output_shift);
-        rxComp_256[i] = simde_mm256_add_epi16(rxComp_256[i], comp); 
-
-        if (mod_order > 2) {
-          simde__m256i mag = oai_mm256_smadd(chF_256[i], chF_256[i], output_shift); // |h|^2
-          // pack and duplicate
-          mag = simde_mm256_packs_epi32(mag, mag);
-          mag = simde_mm256_unpacklo_epi16(mag, mag);
-
-          rxF_ch_maga_256[i] = simde_mm256_add_epi16(rxF_ch_maga_256[i], simde_mm256_mulhrs_epi16(mag, QAM_ampa_256));
-
-          if (mod_order > 4)
-            rxF_ch_magb_256[i] = simde_mm256_add_epi16(rxF_ch_magb_256[i], simde_mm256_mulhrs_epi16(mag, QAM_ampb_256));
-
-          if (mod_order > 6)
-            rxF_ch_magc_256[i] = simde_mm256_add_epi16(rxF_ch_magc_256[i], simde_mm256_mulhrs_epi16(mag, QAM_ampc_256));
-        }        
+    // Wide-accumulator MRC: sum conj(H)*Y products and |h|^2 across antennas in
+    // int32 lanes, apply output_shift once (rounded) after the full sum, then
+    // saturating-pack to int16. The former per-antenna shift + wrapping int16
+    // accumulation lost precision and could wrap at high antenna counts,
+    // corrupting LLRs (see RX16_TBLER_ROOT_CAUSE_REPORT.md).
+    const simde__m256i round_bias = simde_mm256_set1_epi32(output_shift > 0 ? 1 << (output_shift - 1) : 0);
+    for (int i = 0; i < buffer_length >> 3; i++) {
+      simde__m256i acc_re = simde_mm256_setzero_si256();
+      simde__m256i acc_im = simde_mm256_setzero_si256();
+      simde__m256i acc_mag = simde_mm256_setzero_si256();
+      for (int aarx = 0; aarx < nb_rx_ant; aarx++) {
+        const simde__m256i ch = ((simde__m256i *)chFext[aatx][aarx])[i];
+        const simde__m256i rx = ((simde__m256i *)rxFext[aarx])[i];
+        // same re/im decomposition as oai_mm256_cpx_mult_conj, without the shift/pack
+        acc_re = simde_mm256_add_epi32(acc_re, simde_mm256_madd_epi16(ch, rx));
+        acc_im = simde_mm256_add_epi32(acc_im, simde_mm256_madd_epi16(oai_mm256_swap(oai_mm256_conj(ch)), rx));
+        if (mod_order > 2)
+          acc_mag = simde_mm256_add_epi32(acc_mag, simde_mm256_madd_epi16(ch, ch)); // |h|^2
       }
-      if (nb_layers > 1) {
+      acc_re = simde_mm256_srai_epi32(simde_mm256_add_epi32(acc_re, round_bias), output_shift);
+      acc_im = simde_mm256_srai_epi32(simde_mm256_add_epi32(acc_im, round_bias), output_shift);
+      rxComp_256[i] = oai_mm256_pack(acc_re, acc_im);
+
+      if (mod_order > 2) {
+        simde__m256i mag = simde_mm256_srai_epi32(simde_mm256_add_epi32(acc_mag, round_bias), output_shift);
+        // pack and duplicate
+        mag = simde_mm256_packs_epi32(mag, mag);
+        mag = simde_mm256_unpacklo_epi16(mag, mag);
+
+        rxF_ch_maga_256[i] = simde_mm256_mulhrs_epi16(mag, QAM_ampa_256);
+
+        if (mod_order > 4)
+          rxF_ch_magb_256[i] = simde_mm256_mulhrs_epi16(mag, QAM_ampb_256);
+
+        if (mod_order > 6)
+          rxF_ch_magc_256[i] = simde_mm256_mulhrs_epi16(mag, QAM_ampc_256);
+      }
+    }
+    if (nb_layers > 1) {
+      for (int aarx = 0; aarx < nb_rx_ant; aarx++) {
         for (int atx = 0; atx < nrOfLayers; atx++) {
           simde__m256i *rho_256 = (simde__m256i *)rho[aatx][atx];
           simde__m256i *chF_256 = (simde__m256i *)chFext[aatx][aarx];
