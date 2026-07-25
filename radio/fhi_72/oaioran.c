@@ -688,6 +688,13 @@ int xran_fh_rx_read_slot(ru_info_t *ru, int *frame, int *slot)
           g_ul_sym_expected = 0;
         }
         int32_t local_dst[num_totalRB * N_SC_PER_PRB] __attribute__((aligned(64)));
+        // Zero the scratch buffer: with a fragmented symbol (payload > MTU, e.g. 273 PRB at
+        // iqWidth >= 12) each fragment fills only its own PRB slice, and the copy-out below is
+        // triggered by whichever section completes the range. If a fragment is missing, the
+        // untouched slice is uninitialised stack memory and gets written into the RX grid as
+        // full-scale garbage -> corrupt REs with healthy reported energy. Zeroing degrades a
+        // lost fragment to "no energy" (recoverable by HARQ) instead of catastrophic noise.
+        memset(local_dst, 0, sizeof(local_dst));
 
         // LOG_D(HW, "[%d.%d] pRbMap->nPrbElm %d\n", *frame, *slot, pRbMap->nPrbElm);
         for (uint32_t idxElm = 0; idxElm < pRbMap->nPrbElm; idxElm++) {
@@ -698,6 +705,17 @@ int xran_fh_rx_read_slot(ru_info_t *ru, int *frame, int *slot)
 #if defined F_RELEASE
           // UP_nRBSize & UP_nRBStart are for DL U-plane only
           // LOG_D(HW, "[%d.%d] idxElm[%d] startSym[%d]:numSym[%d] UP_startRB[%d]:UP_numRB[%d] sym_idx[%d] ant_id[%d] pRbElm->nRBStart[%d]:pRbElm->nRBSize[%d]\n", *frame, *slot, idxElm, pRbElm->nStartSymb, pRbElm->numSymb, pRbElm->UP_nRBStart, pRbElm->UP_nRBSize, sym_idx, ant_id, pRbElm->nRBStart, pRbElm->nRBSize);
+          // Fragmented-symbol deposit (payload > MTU => 2+ sections per symbol, e.g. 273 PRB at
+          // iqWidth >= 12). sec_desc[] is indexed in ARRIVAL order, not PRB order, so the old
+          // in-loop copy-out fired as soon as the section ENDING the PRB range was reached in
+          // array order — if that section arrived first, the symbol was copied to the RX grid
+          // before the other fragment had been decompressed into local_dst (half-empty symbol),
+          // and the later fragment was then decompressed and silently discarded. Deposit once,
+          // after every section of this symbol has been decompressed into the (zeroed) scratch
+          // buffer, so fragment arrival order no longer matters and a missing fragment yields
+          // zeros (HARQ-recoverable) instead of stale IQ from a previous slot.
+          int sym_have_data = 0;
+          int32_t *sym_pos = NULL;
           for (int idxDesc = 0; idxDesc < XRAN_MAX_FRAGMENT; idxDesc++) {
             p_sec_desc = &pRbElm->sec_desc[sym_idx][idxDesc];
             if (p_sec_desc == NULL)
@@ -740,6 +758,45 @@ int xran_fh_rx_read_slot(ru_info_t *ru, int *frame, int *slot)
               // (not just the first) before reading — affordable because wall-time budgets are
               // 1/TS dilated relative to the sim-time deadline the spec actually defines.
               // Verdict counters distinguish late-but-arrives (recoverable) from upstream-dropped.
+              // PRB-COVERAGE WAIT (always on, self-limiting). A symbol whose payload exceeds the
+              // MTU is split into several U-plane sections; the DU used to read as soon as the
+              // FIRST section registered, so at 273 PRB with iqWidth >= 12 it deposited a
+              // half-covered symbol (the [CONSRMS] probe shows absmean256 = 0 on the fragment-1
+              // half). Counting sections is not enough (a duplicate section satisfies a count
+              // but leaves a PRB hole), so wait until the registered sections actually COVER
+              // num_totalRB. Symbols that fit in one packet cover the range with their first
+              // section and never spin — that is what makes this affordable, unlike the
+              // count-based OAI_FH_EXPECT_FRAGS gate, which spun on every symbol and broke
+              // attach. A genuinely lost fragment costs one bounded spin, then proceeds with
+              // zeros for the missing PRBs.
+              if (idxDesc == 0 && pRbElm->nSecDesc[sym_idx] > 0) {
+                static int cov_cap = 0;
+                if (cov_cap == 0) { const char *e_cc = getenv("OAI_FH_COVER_CAP"); cov_cap = (e_cc && atoi(e_cc) > 0) ? atoi(e_cc) : 20000; }
+                volatile uint16_t *nsv = (volatile uint16_t *)&pRbElm->nSecDesc[sym_idx];
+                static long cov_ok = 0, cov_to = 0;
+                int spun = 0;
+                for (int w = 0; w < cov_cap; w++) {
+                  int cov = 0;
+                  int nsec = (int)*nsv;
+                  if (nsec > XRAN_MAX_FRAGMENT) nsec = XRAN_MAX_FRAGMENT;
+                  for (int d = 0; d < nsec; d++)
+                    cov += pRbElm->sec_desc[sym_idx][d].num_prbu;
+                  if (cov >= num_totalRB)
+                    break;
+                  spun = 1;
+                  __asm__ volatile("pause" ::: "memory");
+                }
+                if (spun) {
+                  int cov = 0, nsec = (int)*nsv;
+                  if (nsec > XRAN_MAX_FRAGMENT) nsec = XRAN_MAX_FRAGMENT;
+                  for (int d = 0; d < nsec; d++) cov += pRbElm->sec_desc[sym_idx][d].num_prbu;
+                  if (cov >= num_totalRB) cov_ok++; else cov_to++;
+                  long tot = cov_ok + cov_to;
+                  if (tot <= 8 || (tot % 5000) == 0)
+                    printf("[FRAGCOV] completed %ld incomplete %ld (need %d) f=%d s=%d sym=%d ant=%d\n",
+                           cov_ok, cov_to, num_totalRB, *frame, *slot, sym_idx, ant_id);
+                }
+              }
               {
                 static int exp_frags = -1;
                 if (exp_frags < 0) { const char *e_ef = getenv("OAI_FH_EXPECT_FRAGS"); exp_frags = (e_ef && e_ef[0]) ? atoi(e_ef) : 0; }
@@ -776,6 +833,13 @@ int xran_fh_rx_read_slot(ru_info_t *ru, int *frame, int *slot)
               pData = p_sec_desc->pData;
               numRB = p_sec_desc->num_prbu;
               startRB = p_sec_desc->start_prbu;
+              // Fragment-descriptor probe: what does each section actually claim? Needed to
+              // tell "second fragment never registered" from "registered but mis-described".
+              { static long fd_n = 0;
+                if (fd_n++ < 24)
+                  printf("[FRAGDESC] f=%d s=%d sym=%d ant=%d idxDesc=%d nSec=%u startRB=%d numRB=%d total=%d/%d comp=%d iqw=%d\n",
+                         *frame, *slot, sym_idx, ant_id, idxDesc, (unsigned)pRbElm->nSecDesc[sym_idx],
+                         startRB, numRB, start_totalRB, num_totalRB, pRbElm->compMethod, pRbElm->iqWidth); }
               // num_prbu & start_prbu are for UL U-plane only
               // LOG_D(HW, "p_sec_desc[%d] startRB[%d]:numRB[%d]\n", idxDesc, startRB, numRB);
 #endif
@@ -958,35 +1022,39 @@ int xran_fh_rx_read_slot(ru_info_t *ru, int *frame, int *slot)
                 printf("pRbElm->compMethod == %d is not supported\n", pRbElm->compMethod);
                 exit(-1);
               }
-              if ((startRB + numRB) == (start_totalRB + num_totalRB)) {
-                // Scale probe: delivered amplitude of the decoded symbol (first 256 int16
-                // = low PRBs). Compares raw-vs-BFP path output scale across iq widths.
-                {
-                  static _Atomic long crms_n = 0;
-                  if (ant_id == 0 && (++crms_n % 2048) == 1) {
-                    long acc = 0;
-                    const int16_t *p16 = (const int16_t *)local_dst;
-                    for (int s = 0; s < 256; s++)
-                      acc += p16[s] < 0 ? -p16[s] : p16[s];
-                    printf("[CONSRMS] f=%d s=%d sym=%d absmean256 %ld\n", *frame, *slot, sym_idx, acc / 256);
-                  }
-                }
-                int pos_len = 0;
-                int neg_len = 0;
-
-                if (start_totalRB < (num_totalRB >> 1)) // there are PRBs left of DC
-                  neg_len = min((num_totalRB * 6) - (start_totalRB * 12), num_totalRB * N_SC_PER_PRB);
-                pos_len = (num_totalRB * N_SC_PER_PRB) - neg_len;
-                // Calculation of the pointer for the section in the buffer.
-                // positive half
-                uint8_t *dst1 = (uint8_t *)(pos + (neg_len == 0 ? ((start_totalRB * N_SC_PER_PRB) - (num_totalRB * 6)) : 0));
-                // negative half
-                uint8_t *dst2 = (uint8_t *)(pos + (start_totalRB * N_SC_PER_PRB) + fftsize - (num_totalRB * 6));
-                memcpy((void *)dst2, (void *)local_dst, neg_len * 4);
-                memcpy((void *)dst1, (void *)&local_dst[neg_len], pos_len * 4);
-              }
+              // This section's IQ is now in local_dst at its own PRB offset; defer the deposit
+              // until every section of the symbol has been decompressed (see note above).
+              sym_have_data = 1;
+              sym_pos = pos;
             }
           } // idxDesc
+          if (sym_have_data && sym_pos != NULL) {
+            // Scale probe: delivered amplitude of the decoded symbol (first 256 int16
+            // = low PRBs). Compares raw-vs-BFP path output scale across iq widths.
+            {
+              static _Atomic long crms_n = 0;
+              if (ant_id == 0 && (++crms_n % 2048) == 1) {
+                long acc = 0;
+                const int16_t *p16 = (const int16_t *)local_dst;
+                for (int s = 0; s < 256; s++)
+                  acc += p16[s] < 0 ? -p16[s] : p16[s];
+                printf("[CONSRMS] f=%d s=%d sym=%d absmean256 %ld\n", *frame, *slot, sym_idx, acc / 256);
+              }
+            }
+            int pos_len = 0;
+            int neg_len = 0;
+
+            if (start_totalRB < (num_totalRB >> 1)) // there are PRBs left of DC
+              neg_len = min((num_totalRB * 6) - (start_totalRB * 12), num_totalRB * N_SC_PER_PRB);
+            pos_len = (num_totalRB * N_SC_PER_PRB) - neg_len;
+            // Calculation of the pointer for the section in the buffer.
+            // positive half
+            uint8_t *dst1 = (uint8_t *)(sym_pos + (neg_len == 0 ? ((start_totalRB * N_SC_PER_PRB) - (num_totalRB * 6)) : 0));
+            // negative half
+            uint8_t *dst2 = (uint8_t *)(sym_pos + (start_totalRB * N_SC_PER_PRB) + fftsize - (num_totalRB * 6));
+            memcpy((void *)dst2, (void *)local_dst, neg_len * 4);
+            memcpy((void *)dst1, (void *)&local_dst[neg_len], pos_len * 4);
+          }
         } // idxElm
 
       } // sym_ind

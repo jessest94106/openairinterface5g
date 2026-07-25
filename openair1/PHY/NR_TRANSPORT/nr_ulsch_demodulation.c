@@ -993,10 +993,17 @@ static void inner_rx(PHY_VARS_gNB *gNB,
     // nb_rx_ant >= 2 REQUIRED: the 2-layer joint detector is degenerate at 1 antenna (can't
     // separate 2 co-channel UEs with 1 RX) -> it corrupts EVERY decode (grants carry garbage,
     // both UEs starve). At 1 antenna the co-scheduled UEs simply collide; IRC cannot help.
-    { static int dg = 0; if (mu_irc && !dmrs_symbol_flag && rel15_ul->rb_size > 137 && dg++ < 6)
-        LOG_E(PHY, "[MU GATE] nb_rx_ant=%d g_mu=%d nb_layer=%d rb_size=%d max_pusch=%d\n",
-              nb_rx_ant, g_mu_mimo_active, nb_layer, rel15_ul->rb_size, gNB->max_nb_pusch); }
-    if (mu_irc && g_mu_mimo_active && pusch_vars->log2_maxh > 0 && nb_rx_ant >= 2 && nb_layer == 1 && rel15_ul->rb_size > 137) {
+    // "Large allocation" must be relative to the CARRIER, not an absolute PRB count: the old
+    // literal 137 was derived as half of a 273-PRB carrier, so at any narrower bandwidth every
+    // grant fell below it and IRC never engaged — the two co-scheduled UEs then collided on the
+    // same PRBs with no spatial separation (measured at 106 PRB: zero [MU METRIC] lines,
+    // MCS 17-24 and ~17% BLER instead of MCS 28). Half the carrier keeps the original 273-PRB
+    // behaviour (137 ~= 273/2) while still excluding small allocations such as Msg3.
+    const int mu_min_rb = frame_parms->N_RB_UL >> 1;
+    { static int dg = 0; if (mu_irc && !dmrs_symbol_flag && rel15_ul->rb_size > mu_min_rb && dg++ < 6)
+        LOG_E(PHY, "[MU GATE] nb_rx_ant=%d g_mu=%d nb_layer=%d rb_size=%d min_rb=%d max_pusch=%d\n",
+              nb_rx_ant, g_mu_mimo_active, nb_layer, rel15_ul->rb_size, mu_min_rb, gNB->max_nb_pusch); }
+    if (mu_irc && g_mu_mimo_active && pusch_vars->log2_maxh > 0 && nb_rx_ant >= 2 && nb_layer == 1 && rel15_ul->rb_size > mu_min_rb) {
       // CRASH FIX (was Block-1): gNB->ulsch[id].harq_process is NULL for unused slots -> the old
       // unguarded ->ulsch_pdu deref segfaulted (at 0) the first time the scan ran past the active
       // ids (dmesg: Tpool segfault at 0, du.log dead right after first [MU METRIC] in EVERY run —
@@ -1010,11 +1017,41 @@ static void inner_rx(PHY_VARS_gNB *gNB,
         // stripped IRC from the slower UE's tail symbols mid-slot (MRC + co-channel interference =
         // garbage LLRs = every co-channel TB dead at high rho). frame/slot match already rejects
         // stale entries; estimates/pdu persist for the slot after completion.
-        if (u->harq_process == NULL) continue;
-        if (u->frame != cur->frame || u->slot != cur->slot) continue; // co-scheduled this slot only
+        // Partner-scan diagnosis: report WHICH condition rejects each candidate. Without this the
+        // only symptom is a silent absence of [MU METRIC] and a fallback to plain MRC.
+        static long ps_null = 0, ps_fs = 0, ps_rb = 0, ps_rnti = 0, ps_hit = 0, ps_log = 0;
+        if (u->harq_process == NULL) { ps_null++; continue; }
+        // Identify the partner by the per-slot CHANNEL-ESTIMATE stamp, not by ulsch[].frame/slot.
+        // ulsch[] carries the entry's LIVE scheduling state, which the scheduler advances to that
+        // UE's NEXT grant before the current slot's decode runs — at 106 PRB the partner's entry
+        // read 250.2 while we were decoding 249.12, so strict equality rejected every genuine
+        // partner (measured: null=0 rb=0 rnti=0 hit=0, all rejections frame/slot) and IRC never
+        // engaged even though the MAC reported 2216 same-PRB reuse slots. The chest stamp is
+        // written when THIS slot's estimate is produced and is exactly what the IRC consumes.
+        if (gNB->pusch_vars[id].mu_chest_frame != (int)frame || gNB->pusch_vars[id].mu_chest_slot != slot) {
+          ps_fs++;
+          if ((ps_log++ % 2000) == 0)
+            LOG_E(PHY, "[MU PSCAN] id=%d rejected chest-stamp: cand %d.%d vs cur %d.%d (ulsch %d.%d) (null=%ld fs=%ld rb=%ld rnti=%ld hit=%ld)\n",
+                  id, gNB->pusch_vars[id].mu_chest_frame, gNB->pusch_vars[id].mu_chest_slot,
+                  (int)frame, slot, u->frame, u->slot, ps_null, ps_fs, ps_rb, ps_rnti, ps_hit);
+          continue;
+        }
         const nfapi_nr_pusch_pdu_t *p = &u->harq_process->ulsch_pdu;
-        if (p->rb_size == rel15_ul->rb_size && p->rb_start == rel15_ul->rb_start && p->rnti != rel15_ul->rnti) {
+        if (p->rb_size != rel15_ul->rb_size || p->rb_start != rel15_ul->rb_start) {
+          ps_rb++;
+          if ((ps_log++ % 2000) == 0)
+            LOG_E(PHY, "[MU PSCAN] id=%d rejected rb: cand %d+%d vs cur %d+%d (null=%ld fs=%ld rb=%ld rnti=%ld hit=%ld)\n",
+                  id, p->rb_start, p->rb_size, rel15_ul->rb_start, rel15_ul->rb_size,
+                  ps_null, ps_fs, ps_rb, ps_rnti, ps_hit);
+          continue;
+        }
+        if (p->rnti == rel15_ul->rnti) { ps_rnti++; continue; }
+        {
           partner = id;
+          ps_hit++;
+          if ((ps_log++ % 2000) == 0)
+            LOG_E(PHY, "[MU PSCAN] HIT id=%d rnti=%04x (null=%ld fs=%ld rb=%ld rnti=%ld hit=%ld)\n",
+                  id, p->rnti, ps_null, ps_fs, ps_rb, ps_rnti, ps_hit);
           break;
         }
       }
@@ -1023,7 +1060,7 @@ static void inner_rx(PHY_VARS_gNB *gNB,
     // symbol is decoded by plain MRC WITH co-channel interference => garbage LLRs for those REs.
     // Track why symbols fall through; printed with [MU METRIC].
     static long mu_c_irc = 0, mu_c_nopart = 0, mu_c_rxe = 0, mu_c_parte = 0, mu_c_byp = 0;
-    if (mu_irc && g_mu_mimo_active && pusch_vars->log2_maxh > 0 && nb_rx_ant >= 2 && nb_layer == 1 && rel15_ul->rb_size > 137 && partner < 0)
+    if (mu_irc && g_mu_mimo_active && pusch_vars->log2_maxh > 0 && nb_rx_ant >= 2 && nb_layer == 1 && rel15_ul->rb_size > mu_min_rb && partner < 0)
       mu_c_nopart++;
     // Signal-present guard: only run IRC when there's actually a received signal to separate on
     // this symbol (rxFext non-trivial). Prevents firing on empty/phantom-grant symbols where the
