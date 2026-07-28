@@ -1212,30 +1212,35 @@ static void inner_rx(PHY_VARS_gNB *gNB,
             LOG_A(PHY, "[CATB] weight staleness: %d slots (%.1f ms sim)\n", cdelay, cdelay * 0.5);
         }
         if (cdelay > 0) {
-          enum { CATB_HRING = 64 };
+          // PER-UE rings. A single shared ring handed UE0 the estimate UE1 had stored — not
+          // stale data but the WRONG UE's channel, which destroys decoding and showed up as a
+          // flat 98.6% collapse at every delay, independent of coherence time. chF2[0] is
+          // "self" and self differs per ulsch_id, so the history must be per ulsch_id too.
+          enum { CATB_HRING = 64, CATB_HUE = 8 };
           const size_t one = sizeof(c16_t) * 2 * nb_rx_ant * buffer_length;
-          static c16_t *hring[CATB_HRING];
-          static size_t hsz[CATB_HRING];
-          static int hpos = 0, hfilled = 0;
+          const int ue = ulsch_id % CATB_HUE;
+          static c16_t *hring[CATB_HUE][CATB_HRING];
+          static size_t hsz[CATB_HUE][CATB_HRING];
+          static int hpos[CATB_HUE], hfilled[CATB_HUE];
           const int d = (cdelay < CATB_HRING) ? cdelay : (CATB_HRING - 1);
-          const int wr = hpos % CATB_HRING;
-          if (hring[wr] == NULL || hsz[wr] != one) {
-            free(hring[wr]);
-            hring[wr] = malloc(one);
-            hsz[wr] = hring[wr] ? one : 0;
+          const int wr = hpos[ue] % CATB_HRING;
+          if (hring[ue][wr] == NULL || hsz[ue][wr] != one) {
+            free(hring[ue][wr]);
+            hring[ue][wr] = malloc(one);
+            hsz[ue][wr] = hring[ue][wr] ? one : 0;
           }
-          if (hring[wr])
-            memcpy(hring[wr], chF2, one);
-          hpos++;
-          if (hfilled < CATB_HRING)
-            hfilled++;
+          if (hring[ue][wr])
+            memcpy(hring[ue][wr], chF2, one);
+          hpos[ue]++;
+          if (hfilled[ue] < CATB_HRING)
+            hfilled[ue]++;
           // Substitute the estimate from d slots ago. Until the ring has d entries we keep the
           // fresh one — otherwise the first d slots would decode against zeros and the run
           // would look like a receiver bug rather than staleness.
-          if (hfilled > d) {
-            const int rd = ((hpos - 1 - d) % CATB_HRING + CATB_HRING) % CATB_HRING;
-            if (hring[rd] && hsz[rd] == one)
-              memcpy(chF2, hring[rd], one);
+          if (hfilled[ue] > d) {
+            const int rd = ((hpos[ue] - 1 - d) % CATB_HRING + CATB_HRING) % CATB_HRING;
+            if (hring[ue][rd] && hsz[ue][rd] == one)
+              memcpy(chF2, hring[ue][rd], one);
           }
           { static long n = 0; if ((n++ % 20000) == 0) LOG_I(PHY, "[CATB] applying H from %d slots ago\n", d); }
         }
