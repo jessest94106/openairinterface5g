@@ -1020,6 +1020,49 @@ static void inner_rx(PHY_VARS_gNB *gNB,
 {
   int nb_layer = rel15_ul->nrOfLayers;
   int nb_rx_ant = frame_parms->nb_antennas_rx;
+  // ---- Cat-B STEP 4 CORE: WEIGHT STALENESS at the SOURCE (OAI_CATB_DELAY_SLOTS=d) --------
+  // Delay the CHANNEL ESTIMATE itself, before anything reads it. An earlier version swapped
+  // only the MMSE receiver's copy (chF2) and produced a flat ~98% collapse at EVERY delay:
+  // the data had been compensated with the FRESH channel while the Gram matrix came from the
+  // stale one, so the decoder inverted a channel that did not match its own input. That
+  // mismatch is total regardless of age, which is why it did not vary with coherence time.
+  // Substituting here keeps extraction, compensation and the Gram matrix mutually consistent
+  // — all of them see one channel, just an older one. That IS the fronthaul loop's effect.
+  // d is in SLOTS: at TS=0.02 a real 100 us FH latency is 2 us of sim time, invisible.
+  {
+    static int cdelay = -1;
+    if (cdelay < 0) {
+      const char *e = getenv("OAI_CATB_DELAY_SLOTS");
+      cdelay = (e && e[0]) ? atoi(e) : 0;
+      if (cdelay > 0)
+        LOG_A(PHY, "[CATB] weight staleness %d slots (%.1f ms sim), applied at the estimate\n", cdelay, cdelay * 0.5);
+    }
+    if (cdelay > 0 && symbol == rel15_ul->start_symbol_index) { // once per slot, not per symbol
+      enum { CR = 64, CU = 8 };
+      const size_t one = sizeof(int32_t) * frame_parms->ofdm_symbol_size * frame_parms->symbols_per_slot;
+      const int ue = ulsch_id % CU, d = (cdelay < CR) ? cdelay : CR - 1;
+      static int32_t *ring[CU][CR][16];
+      static int pos[CU], filled[CU];
+      const int wr = pos[ue] % CR;
+      for (int a = 0; a < nb_rx_ant && a < 16; a++) {
+        if (!ring[ue][wr][a])
+          ring[ue][wr][a] = malloc(one);
+        if (ring[ue][wr][a])
+          memcpy(ring[ue][wr][a], pusch_vars->ul_ch_estimates[a], one);
+      }
+      pos[ue]++;
+      if (filled[ue] < CR)
+        filled[ue]++;
+      if (filled[ue] > d) { // keep the fresh estimate until d slots of history exist
+        const int rd = ((pos[ue] - 1 - d) % CR + CR) % CR;
+        for (int a = 0; a < nb_rx_ant && a < 16; a++)
+          if (ring[ue][rd][a])
+            memcpy(pusch_vars->ul_ch_estimates[a], ring[ue][rd][a], one);
+      }
+      { static long n = 0; if ((n++ % 2000) == 0) LOG_I(PHY, "[CATB] H from %d slots ago\n", d); }
+    }
+  }
+  // ----------------------------------------------------------------------------------------
   int dmrs_symbol_flag = (rel15_ul->ul_dmrs_symb_pos >> symbol) & 0x01;
   int buffer_length = ceil_mod(rel15_ul->rb_size * NR_NB_SC_PER_RB, 16);
   c16_t rxFext[nb_rx_ant][buffer_length] __attribute__((aligned(32)));
@@ -1194,58 +1237,6 @@ static void inner_rx(PHY_VARS_gNB *gNB,
                              soffset + (symbol * frame_parms->ofdm_symbol_size), dmrs_symbol * frame_parms->ofdm_symbol_size,
                              aarx, dmrs_symbol_flag, rel15_ul, frame_parms);
       }
-      // ---- Cat-B STEP 3/4 CORE: WEIGHT STALENESS (OAI_CATB_DELAY_SLOTS=d) -----------------
-      // The experiment asks what fronthaul loop latency costs. That is weights computed from
-      // an OLD channel applied to CURRENT data. Weights derive deterministically from H, so
-      // delaying H by d slots is equivalent to delaying the weights by d slots — and needs no
-      // fronthaul restructuring, no RU change and no xran involvement.
-      // d MUST be in SLOTS, not wall time: at TS=0.02 a real 100 us FH delay is 2 us of sim
-      // time, invisible to the radio. One slot = 0.5 ms sim at 30 kHz.
-      // ponytail: ring of whole chF2 snapshots. Simple and obviously correct; ~163 kB/slot at
-      // 106 PRB x 16 ant, so 64 slots is ~10 MB — cheap next to being able to trust the result.
-      {
-        static int cdelay = -1;
-        if (cdelay < 0) {
-          const char *e = getenv("OAI_CATB_DELAY_SLOTS");
-          cdelay = (e && e[0]) ? atoi(e) : 0;
-          if (cdelay > 0)
-            LOG_A(PHY, "[CATB] weight staleness: %d slots (%.1f ms sim)\n", cdelay, cdelay * 0.5);
-        }
-        if (cdelay > 0) {
-          // PER-UE rings. A single shared ring handed UE0 the estimate UE1 had stored — not
-          // stale data but the WRONG UE's channel, which destroys decoding and showed up as a
-          // flat 98.6% collapse at every delay, independent of coherence time. chF2[0] is
-          // "self" and self differs per ulsch_id, so the history must be per ulsch_id too.
-          enum { CATB_HRING = 64, CATB_HUE = 8 };
-          const size_t one = sizeof(c16_t) * 2 * nb_rx_ant * buffer_length;
-          const int ue = ulsch_id % CATB_HUE;
-          static c16_t *hring[CATB_HUE][CATB_HRING];
-          static size_t hsz[CATB_HUE][CATB_HRING];
-          static int hpos[CATB_HUE], hfilled[CATB_HUE];
-          const int d = (cdelay < CATB_HRING) ? cdelay : (CATB_HRING - 1);
-          const int wr = hpos[ue] % CATB_HRING;
-          if (hring[ue][wr] == NULL || hsz[ue][wr] != one) {
-            free(hring[ue][wr]);
-            hring[ue][wr] = malloc(one);
-            hsz[ue][wr] = hring[ue][wr] ? one : 0;
-          }
-          if (hring[ue][wr])
-            memcpy(hring[ue][wr], chF2, one);
-          hpos[ue]++;
-          if (hfilled[ue] < CATB_HRING)
-            hfilled[ue]++;
-          // Substitute the estimate from d slots ago. Until the ring has d entries we keep the
-          // fresh one — otherwise the first d slots would decode against zeros and the run
-          // would look like a receiver bug rather than staleness.
-          if (hfilled[ue] > d) {
-            const int rd = ((hpos[ue] - 1 - d) % CATB_HRING + CATB_HRING) % CATB_HRING;
-            if (hring[ue][rd] && hsz[ue][rd] == one)
-              memcpy(chF2, hring[ue][rd], one);
-          }
-          { static long n = 0; if ((n++ % 20000) == 0) LOG_I(PHY, "[CATB] applying H from %d slots ago\n", d); }
-        }
-      }
-      // ------------------------------------------------------------------------------------
       { // diagnostic: is the (normal) self channel estimate non-zero here?
         static int cd = 0;
         if (cd++ < 4) {
