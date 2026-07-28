@@ -171,6 +171,14 @@ typedef struct {
   uint64_t catb_calls;
   uint64_t catb_ns_acc;
   uint64_t catb_ns_max;
+  // Cat-B STEP 1: symbol classification. REF symbols must reach the DU per-antenna (the DU
+  // cannot estimate the channel from RU-combined data), DATA symbols are what STEP 3 will
+  // combine. Classification only here — behaviour is unchanged, so a wrong symbol map is
+  // caught now, where it is free, rather than in STEP 3 where it looks like a weight bug.
+  uint16_t catb_ref_mask; // bit s set => symbol s is a reference symbol
+  uint64_t catb_ref_syms;
+  uint64_t catb_data_syms;
+  uint64_t catb_span_reads; // reads straddling a symbol boundary — STEP 3 must split these
   tx_timing_t *tx_timing;
   peer_info_t peer_info;
   int chanmod;
@@ -490,8 +498,29 @@ static void vrtsim_readconfig(vrtsim_state_t *vrtsim_state)
   {
     const char *cs = getenv("VRTSIM_CATB_STATS");
     vrtsim_state->catb_stats = (cs && cs[0] && cs[0] != '0') ? 1 : 0;
+    // Reference-symbol positions: DMRS at 2,7,11 for our 13-symbol PUSCH (typeA pos2,
+    // dmrs_TypeA_Position=0, additionalPosition pos2 — see du_test.conf). Overridable so the
+    // map follows the DMRS config rather than being hardcoded to one TDA.
+    vrtsim_state->catb_ref_mask = (1u << 2) | (1u << 7) | (1u << 11);
+    const char *rs = getenv("VRTSIM_CATB_REF_SYMS");
+    if (rs && rs[0]) {
+      uint16_t m = 0;
+      for (const char *p = rs; *p;) {
+        char *end;
+        long v = strtol(p, &end, 10);
+        if (end == p)
+          break;
+        if (v >= 0 && v <= 13)
+          m |= (uint16_t)(1u << v);
+        p = (*end == ',') ? end + 1 : end;
+      }
+      if (m)
+        vrtsim_state->catb_ref_mask = m;
+    }
     if (vrtsim_state->catb_stats)
-      LOG_A(HW, "VRTSIM: Cat-B RU stats ON (UL combine cost per read call)\n");
+      LOG_A(HW,
+            "VRTSIM: Cat-B RU stats ON (combine cost + symbol map, ref mask 0x%04x)\n",
+            vrtsim_state->catb_ref_mask);
   }
   // Phase-1 UL MU-MIMO steering: VRTSIM_UL_MU_STEER = "auto" (orthogonal DFT beams, angle_u=u/nbAnt)
   // or a comma list of per-UE spatial frequencies (cycles/antenna), e.g. "0,0.25". Absent/empty=off.
@@ -1729,6 +1758,29 @@ static void vrtsim_add_rx_thermal_noise(vrtsim_state_t *st, void **samplesVoid, 
   }
 }
 
+// Cat-B STEP 1: which OFDM symbol contains this sample? mu=1 layout, derived from the
+// sample rate alone so it follows the carrier: slot = sample_rate/100/20 samples, of which
+// FFT is 14/15 and CP 1/15. Symbol 0 carries the long CP (176/2048 of an FFT), symbols 1-13
+// the normal one (144/2048); 14*fft + 13*cp + cp_long = samples_per_slot exactly.
+// Returns -1 if the rate is not yet known.
+static int vrtsim_symbol_of(const vrtsim_state_t *st, uint64_t sample)
+{
+  const int64_t sps = (int64_t)(st->sample_rate / 100.0 / 20.0 + 0.5); // samples per mu=1 slot
+  if (sps <= 0)
+    return -1;
+  const int64_t fft = sps / 15;
+  if (fft <= 0)
+    return -1;
+  const int64_t cp = fft * 144 / 2048;
+  const int64_t cp0 = sps - 14 * fft - 13 * cp; // whatever is left is symbol 0's CP
+  const int64_t off = (int64_t)(sample % (uint64_t)sps);
+  const int64_t sym0_len = fft + cp0;
+  if (off < sym0_len)
+    return 0;
+  const int64_t s = 1 + (off - sym0_len) / (fft + cp);
+  return (s > 13) ? 13 : (int)s;
+}
+
 // Cat-B STEP 0: RU UL-combine cost. Called from BOTH exits of vrtsim_read — the multi-UE
 // path returns early, and anything accounted only at the tail is invisible on the one path
 // this lab actually runs.
@@ -1742,7 +1794,20 @@ static void vrtsim_catb_account(vrtsim_state_t *st, const struct timespec *t0, i
   st->catb_ns_acc += ns;
   if (ns > st->catb_ns_max)
     st->catb_ns_max = ns;
-  if ((++st->catb_calls % 1000) == 0)
+  if ((++st->catb_calls % 1000) == 0) {
+    const uint64_t syms = st->catb_ref_syms + st->catb_data_syms;
+    if (syms)
+      // Gate for STEP 1: ref/data must sit at 3/11 per 14-symbol slot (21.4%/78.6%) for the
+      // default mask. span_reads > 0 means reads straddle symbol boundaries, so STEP 3 must
+      // split a read rather than classify it wholesale.
+      LOG_I(HW,
+            "VRTSIM CATB: symbols ref %lu (%.1f%%) data %lu, span-reads %lu\n",
+            (unsigned long)st->catb_ref_syms,
+            100.0 * st->catb_ref_syms / syms,
+            (unsigned long)st->catb_data_syms,
+            (unsigned long)st->catb_span_reads);
+  }
+  if ((st->catb_calls % 1000) == 0)
     // Cost per READ CALL, not per slot: nsamps is a fraction of a slot, so compare like for
     // like across runs. Budget reference: TS=0.02 gives a 0.5 ms slot 25 ms of wall time.
     LOG_I(HW,
@@ -1798,8 +1863,24 @@ static int vrtsim_read(openair0_device_t *device, openair0_timestamp_t *ptimesta
   // only needs headroom against the 25 ms wall budget (TS=0.02 gives a 0.5 ms slot 25 ms of
   // wall time regardless of sample rate).
   struct timespec catb_t0;
-  if (vrtsim_state->catb_stats)
+  if (vrtsim_state->catb_stats) {
     clock_gettime(CLOCK_MONOTONIC, &catb_t0);
+    // STEP 1: classify only — no behaviour change. Both classes still take the existing
+    // per-antenna path; this exists so a wrong symbol map shows up here rather than as a
+    // phantom beamforming bug in STEP 3.
+    if (vrtsim_state->role == ROLE_SERVER) {
+      const int s0 = vrtsim_symbol_of(vrtsim_state, read_sample);
+      const int s1 = vrtsim_symbol_of(vrtsim_state, read_sample + (uint64_t)nsamps - 1);
+      if (s0 >= 0) {
+        if (vrtsim_state->catb_ref_mask & (1u << s0))
+          vrtsim_state->catb_ref_syms++;
+        else
+          vrtsim_state->catb_data_syms++;
+        if (s1 >= 0 && s1 != s0)
+          vrtsim_state->catb_span_reads++;
+      }
+    }
+  }
   if (vrtsim_state->role == ROLE_SERVER) {
     if (vrtsim_state->num_ues > 1) {
       /* Multi-UE UL combining */
