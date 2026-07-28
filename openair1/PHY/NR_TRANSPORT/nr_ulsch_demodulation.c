@@ -790,6 +790,10 @@ static void catb_publish_weights(catb_weight_ring_t *ring,
 }
 
 // MMSE Rx function: nr_ulsch_mmse_2layers()
+// Cat-B: delayed channel-estimate view, published per UE per antenna. Read-only for
+// consumers; NULL means "use the live estimate".
+static int32_t *catb_hview[8][16];
+
 static uint8_t nr_ulsch_mmse_2layers(int **rxdataF_comp,
                                      uint32_t buffer_length,
                                      int nb_rx_ant,
@@ -1053,13 +1057,16 @@ static void inner_rx(PHY_VARS_gNB *gNB,
       pos[ue]++;
       if (filled[ue] < CR)
         filled[ue]++;
-      if (filled[ue] > d) { // keep the fresh estimate until d slots of history exist
+      // DO NOT write back into pusch_vars->ul_ch_estimates. OAI decodes symbols in parallel
+      // tasks that read that buffer concurrently, so mutating it races with live readers —
+      // which is why substitution destroyed decoding even on a STATIC channel, where the old
+      // and new contents are byte-identical. Publish read-only pointers instead; consumers
+      // below take the delayed view without anyone's shared state being modified.
+      if (filled[ue] > d) {
         const int rd = ((pos[ue] - 1 - d) % CR + CR) % CR;
         for (int a = 0; a < nb_rx_ant && a < 16; a++)
-          if (ring[ue][rd][a])
-            memcpy(pusch_vars->ul_ch_estimates[a], ring[ue][rd][a], one);
+          catb_hview[ue][a] = ring[ue][rd][a];
       }
-      { static long n = 0; if ((n++ % 2000) == 0) LOG_I(PHY, "[CATB] H from %d slots ago\n", d); }
     }
   }
   // ----------------------------------------------------------------------------------------
@@ -1233,9 +1240,10 @@ static void inner_rx(PHY_VARS_gNB *gNB,
       // filled above. Only extract the PARTNER channel into chF2[1]. chF2[0] = self.
       for (int aarx = 0; aarx < nb_rx_ant; aarx++) {
         memcpy(chF2[0][aarx], chFext[0][aarx], buffer_length * sizeof(c16_t));
-        nr_ulsch_extract_rbs(rxF[aarx], (c16_t *)pv_p->ul_ch_estimates[aarx], dummy, chF2[1][aarx],
+        { int32_t *hv = catb_hview[ulsch_id % 8][aarx];
+          nr_ulsch_extract_rbs(rxF[aarx], (c16_t *)(hv ? hv : pv_p->ul_ch_estimates[aarx]), dummy, chF2[1][aarx],
                              soffset + (symbol * frame_parms->ofdm_symbol_size), dmrs_symbol * frame_parms->ofdm_symbol_size,
-                             aarx, dmrs_symbol_flag, rel15_ul, frame_parms);
+                             aarx, dmrs_symbol_flag, rel15_ul, frame_parms); }
       }
       { // diagnostic: is the (normal) self channel estimate non-zero here?
         static int cd = 0;
