@@ -19,6 +19,7 @@
 #include <pthread.h>
 #include <sched.h>
 #include <unistd.h>
+#include "catb_weight_ring.h"
 
 
 #define GNB_PUSCH_RT_TRACE_ENABLE 0
@@ -693,6 +694,101 @@ static void nr_ulsch_construct_HhH_elements(c16_t *conjch00_ch00,
   }
 }
 
+// Cat-B STEP 2: compute the UL MMSE combining weights and publish them for the RU.
+// PASSIVE — nothing here changes decoding; the DU still combines exactly as before.
+//
+// W must be COMPUTED, not forwarded: OAI never materialises a weight matrix. The receiver
+// builds the 2x2 Gram H^H*H and applies its inverse to matched-filtered data, so the N_ant x 2
+// combiner exists only implicitly. Here we form it explicitly, per PRB:
+//     G  = H^H H + nvar*I      (2x2, H is [layer][ant] at the PRB centre RE)
+//     W  = G^-1 H^H            (2 x n_ant)
+// One PRB-centre RE rather than an average over 12: MMSE weights vary slowly across a PRB
+// (that is the premise of per-PRB weighting), and this runs in the DU's per-slot hot path.
+// ponytail: double precision, normalised per PRB — magnitude is arbitrary for a combiner,
+// only the relative pattern across antennas carries information, and the STEP 2 acceptance
+// check is that the per-antenna PHASE matches the configured CDL arrival angles.
+static void catb_publish_weights(catb_weight_ring_t *ring,
+                                 int frame,
+                                 int slot,
+                                 uint16_t rnti,
+                                 int rb_start,
+                                 int nb_rb,
+                                 int nb_rx_ant,
+                                 uint32_t buffer_length,
+                                 const c16_t ch[][nb_rx_ant][buffer_length],
+                                 uint32_t nvar)
+{
+  if (ring == NULL || nb_rx_ant > CATB_MAX_ANT || nb_rb > CATB_MAX_PRB || nb_rb <= 0)
+    return;
+  const int L = CATB_MAX_LAYERS;
+  catb_weight_rec_t *rec = catb_ring_begin(ring);
+  rec->frame = (uint16_t)frame;
+  rec->slot = (uint16_t)slot;
+  rec->rnti = rnti;
+  rec->rb_start = (uint16_t)rb_start;
+  rec->n_prb = (uint16_t)nb_rb;
+  rec->n_ant = (uint8_t)nb_rx_ant;
+  rec->n_layers = (uint8_t)L;
+
+  for (int prb = 0; prb < nb_rb; prb++) {
+    const uint32_t re = (uint32_t)prb * 12u + 6u; // PRB centre
+    if (re >= buffer_length)
+      break;
+    double hr[CATB_MAX_LAYERS][CATB_MAX_ANT], hi[CATB_MAX_LAYERS][CATB_MAX_ANT];
+    for (int l = 0; l < L; l++)
+      for (int a = 0; a < nb_rx_ant; a++) {
+        hr[l][a] = ch[l][a][re].r;
+        hi[l][a] = ch[l][a][re].i;
+      }
+    // G = H^H H + nvar I  (Hermitian 2x2)
+    double gr[2][2] = {{0}}, gi[2][2] = {{0}};
+    for (int i = 0; i < L; i++)
+      for (int j = 0; j < L; j++) {
+        double sr = 0, si = 0;
+        for (int a = 0; a < nb_rx_ant; a++) {
+          sr += hr[i][a] * hr[j][a] + hi[i][a] * hi[j][a];   // conj(h_i)·h_j
+          si += hr[i][a] * hi[j][a] - hi[i][a] * hr[j][a];
+        }
+        gr[i][j] = sr + (i == j ? (double)nvar : 0.0);
+        gi[i][j] = si;
+      }
+    // inv(G) for 2x2: [[g11,-g01],[-g10,g00]] / det
+    const double dr = gr[0][0] * gr[1][1] - gi[0][0] * gi[1][1] - (gr[0][1] * gr[1][0] - gi[0][1] * gi[1][0]);
+    const double di = gr[0][0] * gi[1][1] + gi[0][0] * gr[1][1] - (gr[0][1] * gi[1][0] + gi[0][1] * gr[1][0]);
+    const double dd = dr * dr + di * di;
+    if (dd < 1e-9)
+      continue; // singular (collinear UEs) — leave this PRB zeroed rather than emit garbage
+    const double invr[2][2] = {{gr[1][1], -gr[0][1]}, {-gr[1][0], gr[0][0]}};
+    const double invi[2][2] = {{gi[1][1], -gi[0][1]}, {-gi[1][0], gi[0][0]}};
+    // W = G^-1 H^H  ->  w[l][a] = sum_i invG[l][i] * conj(h_i[a])
+    double wr[CATB_MAX_LAYERS][CATB_MAX_ANT], wi[CATB_MAX_LAYERS][CATB_MAX_ANT], wmax = 0.0;
+    for (int l = 0; l < L; l++)
+      for (int a = 0; a < nb_rx_ant; a++) {
+        double sr = 0, si = 0;
+        for (int i = 0; i < L; i++) {
+          // (invG[l][i]/det) * conj(h_i[a])
+          const double ar = (invr[l][i] * dr + invi[l][i] * di) / dd;
+          const double ai = (invi[l][i] * dr - invr[l][i] * di) / dd;
+          sr += ar * hr[i][a] + ai * hi[i][a];
+          si += ai * hr[i][a] - ar * hi[i][a];
+        }
+        wr[l][a] = sr;
+        wi[l][a] = si;
+        const double m = sr * sr + si * si;
+        if (m > wmax)
+          wmax = m;
+      }
+    const double scale = (wmax > 0.0) ? (29000.0 / sqrt(wmax)) : 0.0; // headroom below Q15 full scale
+    for (int l = 0; l < L; l++)
+      for (int a = 0; a < nb_rx_ant; a++) {
+        const size_t k = catb_w_index(prb, l, a, L, nb_rx_ant);
+        rec->w[2 * k] = (int16_t)lrint(wr[l][a] * scale);
+        rec->w[2 * k + 1] = (int16_t)lrint(wi[l][a] * scale);
+      }
+  }
+  catb_ring_commit(ring, rec);
+}
+
 // MMSE Rx function: nr_ulsch_mmse_2layers()
 static uint8_t nr_ulsch_mmse_2layers(int **rxdataF_comp,
                                      uint32_t buffer_length,
@@ -1079,6 +1175,12 @@ static void inner_rx(PHY_VARS_gNB *gNB,
       partner = -1;
       mu_c_parte++;
     }
+    // Coverage census, printed independently of [MU METRIC] (which only fires once the IRC path
+    // is actually taken) so a partner that is FOUND but then dropped downstream is still visible.
+    { static long cv = 0;
+      if (mu_irc && g_mu_mimo_active && (cv++ % 20000) == 0)
+        LOG_E(PHY, "[MU COV] irc=%ld nopart=%ld rxe=%ld parte=%ld byp=%ld partner=%d\n",
+              mu_c_irc, mu_c_nopart, mu_c_rxe, mu_c_parte, mu_c_byp, partner); }
     if (partner >= 0) {
       NR_gNB_PUSCH *pv_p = &gNB->pusch_vars[partner];
       c16_t chF2[2][nb_rx_ant][buffer_length] __attribute__((aligned(32)));
@@ -1153,13 +1255,24 @@ static void inner_rx(PHY_VARS_gNB *gNB,
       // (out hot, llr dead, all-round HARQ chains). A real co-scheduled partner at the same AGC
       // target sits within a few dB of self; require within 15 dB (selfE>>5) else fall to MRC.
       if (partE < (selfE >> 5)) partE = 0;
-      // Near-orthogonal bypass (env OAI_UL_MU_RHO_BYPASS, percent, default 2; 0=off): band-averaged
-      // corr2pct between the two UEs' estimates. Near-zero => plain MRC already suppresses the
-      // partner (post-MF SIR ~ 1/corr > 17 dB) ABOVE the joint-ML kernels' LLR-fidelity ceiling
-      // (~MCS 15-18), while the per-stream LLR path decodes MCS 28 clean -> fall through to it.
-      // Estimates are per-slot constants -> the decision is TB-consistent across all symbols.
+      // Near-orthogonal bypass (env OAI_UL_MU_RHO_BYPASS, percent; DEFAULT 0 = OFF): when the
+      // band-averaged corr2pct between the two UEs' estimates fell below the threshold, decode
+      // with plain per-stream MRC instead of the joint receiver.
+      //
+      // DISABLED BY DEFAULT because its premise no longer holds. It was added when the joint
+      // kernel had an LLR-fidelity ceiling of ~MCS 15-18, so at low correlation plain MRC was
+      // genuinely the better of two bad options. That ceiling was a fixed-point defect in the
+      // Gram-matrix accumulation, since fixed -- the joint kernel now decodes MCS 28 clean.
+      // With that gone the bypass is strictly worse: MRC does not cancel the partner at all, so
+      // it is capped at post-MF SIR ~ 1/corr (~17 dB at 2% => MCS 21-24), while IRC nulls the
+      // partner and reaches MCS 28. Measured at 106 PRB, 2 UE, 16 RX, CDL-A: runs whose channel
+      // draw put corr below 2% took the bypass on ~70% of symbols (byp=69211 vs irc=28158) and
+      // delivered 113-119 Mbps at MCS 20-24 with ~120 retransmissions, against 177.3 Mbps at
+      // MCS 28/28 with zero retransmissions when the same code path stayed on IRC (byp=0).
+      // Because the trigger is the channel draw, this presented as a random per-run "dip".
+      // Kept as a knob purely so the comparison can be reproduced; set it >0 to re-enable.
       static int mu_rho_byp = -1;
-      if (mu_rho_byp < 0) { const char *e = getenv("OAI_UL_MU_RHO_BYPASS"); mu_rho_byp = (e && e[0]) ? atoi(e) : 2; }
+      if (mu_rho_byp < 0) { const char *e = getenv("OAI_UL_MU_RHO_BYPASS"); mu_rho_byp = (e && e[0]) ? atoi(e) : 0; }
       int mu_corr2 = -1;
       if (partE >= 8 && mu_rho_byp > 0) {
         double cs = 0.0; int cn = 0;
@@ -1260,6 +1373,33 @@ static void inner_rx(PHY_VARS_gNB *gNB,
         // symbol=0 there), and mmse_2layers indexes rxdataF_comp[.][symbol*buffer_length]. Passing
         // the real symbol made every symbol>0 read zeros/garbage and write out-of-row — the reason
         // the earlier OAI_UL_MU_MMSE=1 experiment collapsed to MCS 6.
+        // Cat-B STEP 2 (passive): publish the MMSE weights this receiver uses implicitly, so the
+        // RU could apply them instead. Once per (frame,slot,rnti) — the block runs per symbol and
+        // the channel estimate is per slot, so exporting per symbol would be 11x redundant work in
+        // the hot path for identical data. Nothing below changes; decoding is untouched.
+        {
+          static int catb_export = -1;
+          static catb_weight_ring_t *catb_ring = NULL;
+          if (catb_export < 0) {
+            const char *e = getenv("OAI_CATB_WEIGHT_EXPORT");
+            catb_export = (e && e[0] && e[0] != '0') ? 1 : 0;
+            if (catb_export) {
+              catb_ring = catb_ring_open(1);
+              LOG_A(PHY, "[CATB] weight export %s\n", catb_ring ? "ON" : "FAILED to map ring");
+            }
+          }
+          if (catb_export && catb_ring) {
+            static uint32_t last_f = 0xffffffffu;
+            static int last_s = -1;
+            static uint16_t last_r = 0;
+            if (frame != last_f || slot != last_s || rel15_ul->rnti != last_r) {
+              last_f = frame; last_s = slot; last_r = rel15_ul->rnti;
+              catb_publish_weights(catb_ring, (int)frame, slot, rel15_ul->rnti, rel15_ul->rb_start,
+                                   rel15_ul->rb_size, nb_rx_ant, buffer_length,
+                                   (const c16_t (*)[nb_rx_ant][buffer_length])chF2, nvar);
+            }
+          }
+        }
         nr_ulsch_mmse_2layers(comp2, buffer_length, nb_rx_ant, mga, mgb, mgc, chF2, rel15_ul->rb_size,
                               rel15_ul->qam_mod_order, pusch_vars->log2_maxh, /*symbol*/ 0, mu_nre, nvar);
         nr_ulsch_compute_llr((int32_t *)comp2buf[0], mga[0], mgb[0], mgc[0], llr[0], mu_nre, symbol, rel15_ul->qam_mod_order);
