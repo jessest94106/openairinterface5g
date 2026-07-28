@@ -583,7 +583,8 @@ static bool set_fh_eaxcid_conf_mplane(struct xran_eaxcid_config *eaxcid_conf, en
       eaxcid_conf->mask_cuPortId = 0xf000;
       eaxcid_conf->mask_bandSectorId = 0x0c00;
       eaxcid_conf->mask_ccId = 0x0300;
-      eaxcid_conf->mask_ruPortId = 0x000f;
+      // 8 bits, matching the non-M-plane path — 4 bits cannot address data + PRACH eAxC
+      eaxcid_conf->mask_ruPortId = 0x00ff;
       eaxcid_conf->bit_cuPortId = 12;
       eaxcid_conf->bit_bandSectorId = 10;
       eaxcid_conf->bit_ccId = 8;
@@ -622,7 +623,15 @@ static bool set_fh_eaxcid_conf(struct xran_eaxcid_config *eaxcid_conf, enum xran
       eaxcid_conf->mask_cuPortId = 0xf000;
       eaxcid_conf->mask_bandSectorId = 0x0c00;
       eaxcid_conf->mask_ccId = 0x0300;
-      eaxcid_conf->mask_ruPortId = 0x000f;
+      // WAS 0x000f (4 bits = 16 flows) — too narrow for this deployment and it silently
+      // corrupted the antenna decode. RU_Port_ID must address BOTH the per-antenna data eAxC
+      // and the PRACH eAxC at eAxC_offset=16, i.e. 32 flows at 16 RX. With 4 bits, PRACH
+      // eAxCs 16-31 truncated to 0-15 and `aarx = eaxc - offset` went NEGATIVE (-16..-1):
+      // observed as "Invalid PRACH C-plane config ... aarx=-4 eAxC_offset=16", attach 0/2,
+      // PRACH energy 0.0. Bits 4-7 were unused in this layout (union was 0xff0f, gap 0x00f0),
+      // so widening to 8 bits costs nothing and disturbs no other field. Cat-A already uses
+      // 5 bits (0x001f) for exactly this reason.
+      eaxcid_conf->mask_ruPortId = 0x00ff;
       eaxcid_conf->bit_cuPortId = 12;
       eaxcid_conf->bit_bandSectorId = 10;
       eaxcid_conf->bit_ccId = 8;
@@ -1125,6 +1134,18 @@ bool get_xran_config(void *mplane_api, const struct openair0_config *openair0_cf
     Therefore, each FH parameter is hardcoded to CAT A.
     If you are interested in CAT B, please be aware that parameters of fh_init and fh_config structs must be modified accordingly. */
   enum xran_category xran_cat = XRAN_CATEGORY_A;
+  // Cat-B probe (OAI_XRAN_CAT=B). Upstream hardcodes CAT A and warns that fh_init/fh_config
+  // parameters must change for CAT B — this override exists to MEASURE how far the link gets,
+  // not to claim Cat-B support. It matters because Cat-B changes the eAxC ID bit layout on both
+  // ends (set_fh_eaxcid_conf below), so it is a fronthaul-wide change, not a local toggle.
+  // Both nr-softmodem and nr-oru link this file, so one variable moves both sides together.
+  {
+    const char *e = getenv("OAI_XRAN_CAT");
+    if (e && (e[0] == 'B' || e[0] == 'b' || e[0] == '1')) {
+      xran_cat = XRAN_CATEGORY_B;
+      printf("[CATB] xran category forced to B (eAxC ID layout changes; upstream supports A only)\n");
+    }
+  }
 
   if (!set_fh_init(mplane_api, fh_init, xran_cat)) {
     printf("could not read FHI 7.2/ORAN config\n");
