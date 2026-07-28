@@ -60,6 +60,76 @@ volatile bool first_call_set = false;
 int xran_is_prach_slot(uint8_t PortId, uint32_t subframe_id, uint32_t slot_id);
 #include "common/utils/LOG/log.h"
 
+#include "openair1/PHY/NR_TRANSPORT/catb_weight_ring.h"
+
+// ---- Cat-B STEP 3a.1: UL C-plane beamforming weights (emission only) --------------------
+// Weights are computed in PHY (nr_ulsch_demodulation.c) and handed here through the shm ring,
+// which is an INTRA-DU handoff between layers — the DU->RU transport is the C-plane below.
+// Wideband for 3a: numSetBFWs=1 => one section, which is all XRAN_MAX_SET_BFWS(=1) allows and
+// all the latency experiment needs (staleness is the variable; granularity is not).
+#define CATB_BFW_ANT 16
+#define CATB_BFW_EXTBUF 512 // 16 ant x 4 B + ext-1 header; static, never allocate in this path
+static void catb_bfw_attach(struct xran_prb_elm *pRbElm)
+{
+  static int en = -1;
+  static catb_weight_ring_t *ring = NULL;
+  if (en < 0) {
+    const char *e = getenv("OAI_CATB_BFW");
+    en = (e && e[0] && e[0] != '0') ? 1 : 0;
+  }
+  if (!en || pRbElm == NULL)
+    return;
+  // RETRY the mapping instead of caching failure. This path first runs while the C-plane is
+  // being built for the very first UL slot — long before any UE has attached, and therefore
+  // before PHY has created the ring (PHY creates it on its first MU-IRC decode). A one-shot
+  // init here found no ring, latched OFF, and the feature silently never ran.
+  if (ring == NULL) {
+    static long tries = 0;
+    if ((tries++ % 2000) != 0)
+      return;
+    ring = catb_ring_open(0);
+    if (ring == NULL)
+      return;
+    LOG_A(HW, "[CATB] UL C-plane BFW emission ON (ring mapped after %ld attempts)\n", tries);
+  }
+  static catb_weight_rec_t rec;
+  if (!catb_ring_read(ring, 0, &rec) || rec.n_ant == 0)
+    return;
+  // Wideband: one weight vector across antennas, taken from the mid-band PRB. 3b refines this
+  // to per-PRB/bundle; Step 2 measured adjacent-PRB weight correlation at 0.91-0.96, so this
+  // gives up real but bounded accuracy.
+  static int16_t iq[CATB_BFW_ANT * 2];
+  const int nant = (rec.n_ant > CATB_BFW_ANT) ? CATB_BFW_ANT : rec.n_ant;
+  const int prb = rec.n_prb / 2;
+  for (int a = 0; a < nant; a++) {
+    const size_t k = catb_w_index(prb, 0 /*layer 0*/, a, rec.n_layers, rec.n_ant);
+    iq[2 * a] = rec.w[2 * k];
+    iq[2 * a + 1] = rec.w[2 * k + 1];
+  }
+  static int8_t extbuf[CATB_BFW_EXTBUF];
+  pRbElm->bf_weight.nAntElmTRx = nant;
+  pRbElm->bf_weight.bfwIqWidth = 16; // uncompressed to start; this is the BFW compression knob
+  pRbElm->bf_weight.bfwCompMeth = XRAN_BFWCOMPMETHOD_NONE; // BLKSCALE/ULAW/BEAMSPACE rte_panic()
+  pRbElm->bf_weight.numSetBFWs = 1;
+  pRbElm->bf_weight.numBundPrb = 0; // 0 => ext-1 rather than ext-11
+  pRbElm->bf_weight.extType = 1;
+  // Required for xran to emit weights rather than a beam index — without it the section stays
+  // index-based (XRAN_BEAM_ID_BASED=0) and the extension is never attached.
+  pRbElm->BeamFormingType = XRAN_BEAM_WEIGHT;
+  pRbElm->bf_weight.maxExtBufSize = CATB_BFW_EXTBUF;
+  const int32_t len = xran_cp_populate_section_ext_1(extbuf, CATB_BFW_EXTBUF, iq, pRbElm);
+  if (len <= 0) {
+    static int warned = 0;
+    if (!warned++)
+      LOG_E(HW, "[CATB] xran_cp_populate_section_ext_1 returned %d — BFW not attached\n", len);
+    return;
+  }
+  pRbElm->bf_weight.p_ext_section = extbuf;
+  pRbElm->bf_weight.ext_section_sz = (int16_t)len;
+  { static long n = 0; if ((n++ % 20000) == 0) LOG_I(HW, "[CATB] BFW attached, ext len %d, %d ant\n", len, nant); }
+}
+// ----------------------------------------------------------------------------------------
+
 #ifndef USE_POLLING
 extern notifiedFIFO_t oran_sync_fifo;
 atomic_int xran_queue_length = 0;
@@ -1186,6 +1256,12 @@ int xran_fh_tx_send_slot(ru_info_t *ru, int frame, int slot, uint64_t timestamp)
         // LOG_D(HW, "pPrbMap->nPrbElm %d\n", pPrbMap->nPrbElm);
         for (uint32_t idxElm = 0; idxElm < pPrbMap->nPrbElm; idxElm++) {
           struct xran_prb_elm *pRbElm = &pPrbMap->prbMap[idxElm];
+          // Cat-B STEP 3a.1 (OAI_CATB_BFW=1): attach beamforming weights to this UL C-plane
+          // section. EMISSION ONLY — the RU has no consumer yet, so throughput must not move;
+          // the point is to prove the bytes reach the wire before anything depends on them.
+          // xran_cp_populate_section_ext_1() is an API the APPLICATION must call: it is declared
+          // in xran_cp_api.h and never invoked inside xran, which is why nothing emits BFW today.
+          catb_bfw_attach(pRbElm);
           int numRB, startRB;
 #if defined F_RELEASE
           numRB = pRbElm->UP_nRBSize;
