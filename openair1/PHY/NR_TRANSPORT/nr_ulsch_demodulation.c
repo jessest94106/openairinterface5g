@@ -1194,6 +1194,53 @@ static void inner_rx(PHY_VARS_gNB *gNB,
                              soffset + (symbol * frame_parms->ofdm_symbol_size), dmrs_symbol * frame_parms->ofdm_symbol_size,
                              aarx, dmrs_symbol_flag, rel15_ul, frame_parms);
       }
+      // ---- Cat-B STEP 3/4 CORE: WEIGHT STALENESS (OAI_CATB_DELAY_SLOTS=d) -----------------
+      // The experiment asks what fronthaul loop latency costs. That is weights computed from
+      // an OLD channel applied to CURRENT data. Weights derive deterministically from H, so
+      // delaying H by d slots is equivalent to delaying the weights by d slots — and needs no
+      // fronthaul restructuring, no RU change and no xran involvement.
+      // d MUST be in SLOTS, not wall time: at TS=0.02 a real 100 us FH delay is 2 us of sim
+      // time, invisible to the radio. One slot = 0.5 ms sim at 30 kHz.
+      // ponytail: ring of whole chF2 snapshots. Simple and obviously correct; ~163 kB/slot at
+      // 106 PRB x 16 ant, so 64 slots is ~10 MB — cheap next to being able to trust the result.
+      {
+        static int cdelay = -1;
+        if (cdelay < 0) {
+          const char *e = getenv("OAI_CATB_DELAY_SLOTS");
+          cdelay = (e && e[0]) ? atoi(e) : 0;
+          if (cdelay > 0)
+            LOG_A(PHY, "[CATB] weight staleness: %d slots (%.1f ms sim)\n", cdelay, cdelay * 0.5);
+        }
+        if (cdelay > 0) {
+          enum { CATB_HRING = 64 };
+          const size_t one = sizeof(c16_t) * 2 * nb_rx_ant * buffer_length;
+          static c16_t *hring[CATB_HRING];
+          static size_t hsz[CATB_HRING];
+          static int hpos = 0, hfilled = 0;
+          const int d = (cdelay < CATB_HRING) ? cdelay : (CATB_HRING - 1);
+          const int wr = hpos % CATB_HRING;
+          if (hring[wr] == NULL || hsz[wr] != one) {
+            free(hring[wr]);
+            hring[wr] = malloc(one);
+            hsz[wr] = hring[wr] ? one : 0;
+          }
+          if (hring[wr])
+            memcpy(hring[wr], chF2, one);
+          hpos++;
+          if (hfilled < CATB_HRING)
+            hfilled++;
+          // Substitute the estimate from d slots ago. Until the ring has d entries we keep the
+          // fresh one — otherwise the first d slots would decode against zeros and the run
+          // would look like a receiver bug rather than staleness.
+          if (hfilled > d) {
+            const int rd = ((hpos - 1 - d) % CATB_HRING + CATB_HRING) % CATB_HRING;
+            if (hring[rd] && hsz[rd] == one)
+              memcpy(chF2, hring[rd], one);
+          }
+          { static long n = 0; if ((n++ % 20000) == 0) LOG_I(PHY, "[CATB] applying H from %d slots ago\n", d); }
+        }
+      }
+      // ------------------------------------------------------------------------------------
       { // diagnostic: is the (normal) self channel estimate non-zero here?
         static int cd = 0;
         if (cd++ < 4) {

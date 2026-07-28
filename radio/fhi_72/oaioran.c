@@ -113,7 +113,12 @@ static void catb_bfw_attach(struct xran_prb_elm *pRbElm)
   // the mbuf start. Rotating pool: each buffer is attached to an in-flight mbuf and released
   // by xran's free callback, so reusing one buffer for every section would corrupt packets
   // still on the wire.
-  enum { CATB_HEAD = RTE_PKTMBUF_HEADROOM + 64, CATB_POOL = 128 };
+  // Headroom and total size both generous. xran back-steps from p_ext_section by
+  // RTE_PKTMBUF_HEADROOM + ecpri_hdr + section1_header AND extends the claimed mbuf length by
+  // the same plus 18 — so the attachment reads and DMAs OUTSIDE the region we sized for the
+  // payload alone. Undersizing produced a segfault in libxran at a sign-extended (negative)
+  // address from L1_tx_thread. 1 KB head + 4 KB body leaves room for both directions.
+  enum { CATB_HEAD = 1024, CATB_BODY = 4096, CATB_POOL = 128 };
   static int8_t *pool[CATB_POOL];
   static int pool_idx = 0;
   static int pool_failed = 0;
@@ -121,14 +126,15 @@ static void catb_bfw_attach(struct xran_prb_elm *pRbElm)
     return;
   if (pool[0] == NULL) {
     for (int i = 0; i < CATB_POOL; i++) {
-      pool[i] = rte_malloc(NULL, CATB_HEAD + CATB_BFW_EXTBUF, 64);
+      pool[i] = rte_malloc(NULL, CATB_HEAD + CATB_BODY, 64);
+      if (pool[i]) memset(pool[i], 0, CATB_HEAD + CATB_BODY);
       if (pool[i] == NULL) {
         LOG_E(HW, "[CATB] rte_malloc failed for BFW ext buffer %d — BFW disabled\n", i);
         pool_failed = 1;
         return;
       }
     }
-    LOG_A(HW, "[CATB] BFW ext pool: %d x %d B from rte_malloc\n", CATB_POOL, (int)(CATB_HEAD + CATB_BFW_EXTBUF));
+    LOG_A(HW, "[CATB] BFW ext pool: %d x %d B from rte_malloc\n", CATB_POOL, (int)(CATB_HEAD + CATB_BODY));
   }
   // atomic: the C-plane loop runs per antenna per symbol and may be threaded; two sections
   // sharing a buffer while both mbufs are in flight would corrupt packets.
