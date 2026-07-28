@@ -76,6 +76,11 @@ typedef enum { ROLE_SERVER = 1, ROLE_CLIENT } role;
 #define CLIENT_NUM_RX_HLP "Number of RX antennas of the client, specified on the server\n"
 #define TX_SAMPLE_ADVANCE_HLP "TX timestamp advance in samples for server writes\n"
 #define VRTSIM_RX_SNR_DISABLED (-1000)
+
+// Pre-scaled RX thermal-noise table: 2^23 int16 = 16 MB. See rx_noise_tab in the state struct.
+#define VRTSIM_NOISE_TAB_LOG2 23
+#define VRTSIM_NOISE_TAB_SIZE (1u << VRTSIM_NOISE_TAB_LOG2)
+#define VRTSIM_NOISE_TAB_MASK (VRTSIM_NOISE_TAB_SIZE - 1u)
 #define RX_TARGET_SNR_HLP \
   "Target UL time-domain RX SNR in dB. When set (client/UE only), per-slot AGC measures the post-channel " \
   "signal power and scales injected Gaussian noise to hit this SNR. Unset = no AGC noise.\n"
@@ -154,6 +159,18 @@ typedef struct {
   uint64_t rx_samples_late;
   uint64_t rx_early;
   uint64_t rx_samples_total;
+  // rx_samples_late is incremented per SUB-READ (inside loops over UEs x antennas x layers)
+  // while rx_samples_total counts once per vrtsim_read() call, so late/total was inflated by
+  // the loop count — 32x at 2 UEs x 16 antennas, making the RX realtime figure meaningless
+  // (it read >100% while the link was healthy). rx_subreads counts the same unit as late.
+  uint64_t rx_subreads;
+  // Cat-B RU instrumentation (VRTSIM_CATB_STATS=1): per-call UL combine cost, so RU real-time
+  // headroom is measured BEFORE spatial combining moves into the RU. RU overrun mimics both
+  // congestion and latency degradation, and has already caused two false diagnoses here.
+  int catb_stats;
+  uint64_t catb_calls;
+  uint64_t catb_ns_acc;
+  uint64_t catb_ns_max;
   tx_timing_t *tx_timing;
   peer_info_t peer_info;
   int chanmod;
@@ -164,6 +181,24 @@ typedef struct {
   int rx_target_snr_db;  // UL time-domain RX SNR target in dB (per-slot AGC); VRTSIM_RX_SNR_DISABLED = off
   double agc_psig_ewma[32];  // per-antenna SLOW EWMA of signal power (tau ~1 sim-second) for AGC noise scaling
   double agc_sig_samps[32];  // per-antenna count of signal samples folded into the EWMA (convergence tracking)
+  double rx_noise_sigma;     // CONSTANT receiver thermal-noise stddev, int16 LSB per I/Q component.
+                             // env VRTSIM_RX_NOISE_SIGMA; 0 = off. Set once, never derived from the
+                             // signal: SNR then comes from the link budget (TX power + chanmod
+                             // path_loss_dB on unit-power taps) and fades with the channel, instead
+                             // of being pinned by an estimator that tracks whatever is transmitted.
+                             // Added ONCE at the gNB after the multi-UE merge, so the floor does not
+                             // scale with the number of co-scheduled UEs.
+  unsigned int rx_noise_seed[32];  // per-antenna xorshift state (independent draws => MRC array gain)
+  int16_t *rx_noise_tab;     // PRE-SCALED Gaussian noise table (unit-variance * rx_noise_sigma), built
+                             // once at init. Replaces per-sample Box-Muller, which cost 4 libm calls
+                             // (log/sqrt/cos/sin, double) per COMPLEX sample = ~100 cycles: at
+                             // 122.88 Msps x 16 ant that is 983040 samples/slot ~= 27.7 ms against a
+                             // 25 ms wall budget (111%), so the RU's UL read overran the shm ring,
+                             // shm_td_iq_channel_rx returned TOO_LATE leaving the buffer untouched,
+                             // and every antenna got stale zeros -> the UE signal vanished entirely
+                             // (measured: merge census e0=0 for the whole run) and PRACH never
+                             // detected at 189/273 PRB. Table lookup is one load + one add.
+  uint32_t rx_noise_pos[32]; // per-antenna read cursor into rx_noise_tab (sequential => prefetchable)
   int ul_noise_std;      // per-antenna INDEPENDENT UL noise stddev (int16 units), env VRTSIM_UL_NOISE_STD. 0=off.
                          // Raises the gNB PRACH I0 (no-chanmod passthrough has none -> saturated 48 dB detection).
                          // Independent per RX antenna so the 4-RX coherent combine yields real array gain
@@ -385,6 +420,58 @@ static void vrtsim_readconfig(vrtsim_state_t *vrtsim_state)
     vrtsim_state->ul_read_advance = atoi(ulra);
     LOG_I(HW, "VRTSIM: UL read advance overridden to %d samples (env)\n", vrtsim_state->ul_read_advance);
   }
+  // Receiver thermal noise: constant stddev in int16 LSB per I/Q component, applied once at the
+  // gNB per RX antenna (see vrtsim_add_rx_thermal_noise). Physically this is kTB*NF referred to
+  // the antenna port; here it is expressed directly in sample units, since SNR depends only on
+  // the ratio of signal to noise and the digital full-scale anchor cancels out of it.
+  vrtsim_state->rx_noise_sigma = 0.0;
+  { const char *e = getenv("VRTSIM_RX_NOISE_SIGMA");
+    if (e != NULL && e[0] != '\0') {
+      vrtsim_state->rx_noise_sigma = atof(e);
+      LOG_A(HW, "VRTSIM: RX thermal noise sigma %.3f LSB/component, fixed, per-antenna, all slots (env)\n",
+            vrtsim_state->rx_noise_sigma);
+    }
+  }
+  for (int a = 0; a < 32; a++)
+    vrtsim_state->rx_noise_seed[a] = 0x2545F491u * (a + 1) + 0x9E3779B9u; // distinct per-antenna stream
+  // Build the pre-scaled Gaussian table ONCE. sigma is constant for the run, so bake it in and the
+  // hot path becomes a load + an add. Antennas walk the table SEQUENTIALLY (prefetcher-friendly)
+  // from fixed, widely separated start offsets: the separation is constant because every antenna
+  // advances by the same 2*nsamps each slot, so no two antennas ever read the same entry at the
+  // same instant -> the draws stay spatially independent, which is what MRC array gain needs.
+  // ponytail: 2^23 entries = 16 MB = 34 ms of sim time at 122.88 Msps before an antenna's sequence
+  // repeats (32x the 1.07 ms period the AGC path already shipped with). If a run ever needs a
+  // longer decorrelation time than that, raise VRTSIM_NOISE_TAB_LOG2 — cost is linear in memory.
+  vrtsim_state->rx_noise_tab = NULL;
+  if (vrtsim_state->rx_noise_sigma > 0.0) {
+    vrtsim_state->rx_noise_tab = malloc(VRTSIM_NOISE_TAB_SIZE * sizeof(int16_t));
+    if (vrtsim_state->rx_noise_tab == NULL) {
+      LOG_E(HW, "VRTSIM: FAILED to allocate %u-entry RX noise table -- NOISE DISABLED, run is invalid\n",
+            VRTSIM_NOISE_TAB_SIZE);
+      vrtsim_state->rx_noise_sigma = 0.0;
+    } else {
+      unsigned int x = 0x2545F491u;
+      const double sg = vrtsim_state->rx_noise_sigma;
+      for (uint32_t i = 0; i < VRTSIM_NOISE_TAB_SIZE; i += 2) {
+        // Box-Muller, OFFLINE: one pair of uniforms -> two independent Gaussians (cos and sin).
+        x ^= x << 13; x ^= x >> 17; x ^= x << 5;
+        const double u1 = ((x >> 8) + 1.0) * (1.0 / 16777216.0);
+        x ^= x << 13; x ^= x >> 17; x ^= x << 5;
+        const double u2 = ((x >> 8) + 1.0) * (1.0 / 16777216.0);
+        const double mag = sg * sqrt(-2.0 * log(u1));
+        const double ang = 2.0 * M_PI * u2;
+        const long v0 = lrint(mag * cos(ang));
+        const long v1 = lrint(mag * sin(ang));
+        vrtsim_state->rx_noise_tab[i]     = (int16_t)(v0 > 32767 ? 32767 : (v0 < -32768 ? -32768 : v0));
+        vrtsim_state->rx_noise_tab[i + 1] = (int16_t)(v1 > 32767 ? 32767 : (v1 < -32768 ? -32768 : v1));
+      }
+      for (int a = 0; a < 32; a++)
+        vrtsim_state->rx_noise_pos[a] = (uint32_t)a * (VRTSIM_NOISE_TAB_SIZE / 32);
+      LOG_A(HW, "VRTSIM: RX noise table built, %u entries (%.1f MB), pre-scaled by sigma %.3f\n",
+            VRTSIM_NOISE_TAB_SIZE, VRTSIM_NOISE_TAB_SIZE * sizeof(int16_t) / 1048576.0,
+            vrtsim_state->rx_noise_sigma);
+    }
+  }
   // Per-antenna independent UL noise (raise gNB I0 / de-saturate PRACH; enable massive-MIMO array gain).
   vrtsim_state->ul_noise_std = 0;
   const char *ulns = getenv("VRTSIM_UL_NOISE_STD");
@@ -400,6 +487,12 @@ static void vrtsim_readconfig(vrtsim_state_t *vrtsim_state)
   }
   for (int a = 0; a < MAX_NUM_ANTENNAS_TX; a++)
     vrtsim_state->ul_noise_seed[a] = 0x9E3779B9u * (a + 1); // distinct per-antenna seed -> independent noise
+  {
+    const char *cs = getenv("VRTSIM_CATB_STATS");
+    vrtsim_state->catb_stats = (cs && cs[0] && cs[0] != '0') ? 1 : 0;
+    if (vrtsim_state->catb_stats)
+      LOG_A(HW, "VRTSIM: Cat-B RU stats ON (UL combine cost per read call)\n");
+  }
   // Phase-1 UL MU-MIMO steering: VRTSIM_UL_MU_STEER = "auto" (orthogonal DFT beams, angle_u=u/nbAnt)
   // or a comma list of per-UE spatial frequencies (cycles/antenna), e.g. "0,0.25". Absent/empty=off.
   vrtsim_state->ul_mu_steer = 0;
@@ -1097,8 +1190,12 @@ static void perform_channel_modelling(void *arg)
 
   // Per-slot target-SNR AGC: UL only (client = UE TX -> RU/gNB RX). Accumulate this
   // slot's signal/noise power across batches to log the achieved time-domain RX SNR.
+  // The client-side AGC is mutually exclusive with the receiver thermal floor: with both on,
+  // noise would be injected twice (once per UE at the transmitter, once at the gNB), and the
+  // AGC would additionally re-scale its share to chase whatever the link budget just did.
   const bool agc_on = (vrtsim_state->rx_target_snr_db != VRTSIM_RX_SNR_DISABLED)
-                      && (vrtsim_state->role == ROLE_CLIENT);
+                      && (vrtsim_state->role == ROLE_CLIENT)
+                      && (vrtsim_state->rx_noise_sigma <= 0.0);
   double snr_psig_acc = 0.0, snr_pnoise_acc = 0.0;
   long snr_nsamp_acc = 0;
 
@@ -1569,6 +1666,94 @@ static int vrtsim_write_beams(openair0_device_t *device,
   return nsamps;
 }
 
+/* Receiver thermal noise: a CONSTANT floor, independent per RX antenna.
+ *
+ * sigma is fixed for the run (VRTSIM_RX_NOISE_SIGMA, in int16 LSB per I/Q component) — it is
+ * never derived from the signal, so SNR is set by the link budget (UE TX power and the
+ * chanmod path_loss_dB applied to the unit-power taps) and varies with fading exactly as it
+ * should, instead of being pinned by a tracking estimator.
+ *
+ * Draws come from a PRE-SCALED Gaussian table built once at init (rx_noise_tab), NOT from
+ * per-sample Box-Muller. That matters for real time, not just tidiness: Box-Muller costs 4 libm
+ * calls (log/sqrt/cos/sin, double) per complex sample ~= 100 cycles, and libm calls are scalar,
+ * so the loop cannot vectorise. At 122.88 Msps x 16 antennas that is 983040 complex samples per
+ * slot ~= 27.7 ms of CPU against a 25 ms wall budget (TS=0.02 gives a 0.5 ms slot 25 ms of wall
+ * time REGARDLESS of sample rate — so the work doubles from 106 -> 189 PRB while the budget does
+ * not, 55% -> 111%). Over budget, the RU's UL read fell behind the ring, shm_td_iq_channel_rx
+ * returned CHANNEL_ERROR_TOO_LATE leaving the destination untouched, the reused ul_combine_buffer
+ * handed every antenna its stale zeros, and the UE signal vanished outright — measured as merge
+ * census e0 = 0 for an entire run, and PRACH never detecting at 189/273 PRB while 106 was fine.
+ * The table makes the hot path a load + an add (sigma is baked in, so not even a multiply).
+ *
+ * Why not the shared noise_device pool: it is a frozen 65536-sample block (state.running is
+ * declared and tested but never set true, so its refresh thread exits immediately) = 1.07 ms of
+ * noise cycled forever at 61.44 Msps, and random_uint() races across the per-antenna actor
+ * threads. Under a fixed floor that period would become the literal statistics of the thermal
+ * noise. rx_noise_tab is the same idea done safely: 32x the period, no races, and a proper
+ * Gaussian PDF (the ORU-side injector this replaces used a uniform PDF, wrong tails for thermal).
+ */
+static void vrtsim_add_rx_thermal_noise(vrtsim_state_t *st, void **samplesVoid, int nbAnt, int nsamps,
+                                        uint64_t read_sample)
+{
+  if (st->rx_noise_sigma <= 0.0)
+    return;
+  // NOTE on the PRACH slot: gating noise out of slot 19 was TRIED and REVERTED. It did not
+  // restore 273 PRB (PRACH stayed 23.5 dB, attach 0/2 — so the detector normalises against a
+  // floor estimated outside the PRACH slot, and silencing that slot alone changes nothing) and
+  // it REGRESSED the working 106 PRB case (177 -> 87 Mbps, attach 1/2). Noise is therefore
+  // applied to every slot, which is also the physically honest choice.
+  // HISTORICAL (root cause now known, see the header comment — it was the injector's own CPU cost
+  // starving the RU read, not anything about the noise level or the PRACH slot):
+  // KNOWN LIMITATION: this fixed floor is calibrated for 106 PRB (sigma 7). At 189/273 PRB ANY
+  // sigma collapses PRACH to ~22-23 dB and attach fails, while sigma=0 gives 41.9 dB and 2/2 —
+  // a step response, not a level effect. Root cause not yet isolated; use the target-SNR AGC on
+  // those carriers until the link-budget rework (PHYSICAL_LINKBUDGET_SCOPE.md) replaces the
+  // hand-tuned sigma with a dBm-anchored floor.
+  (void)read_sample;
+  const int16_t *const tab = st->rx_noise_tab;
+  if (tab == NULL)
+    return;
+  for (int aarx = 0; aarx < nbAnt; aarx++) {
+    if (samplesVoid[aarx] == NULL)
+      continue;
+    int16_t *s = (int16_t *)samplesVoid[aarx];
+    uint32_t p = st->rx_noise_pos[aarx & 31];
+    // Hot path: one table load + one add + saturate per component. The table is already scaled by
+    // sigma, so there is no multiply either. Sequential in p => the hardware prefetcher covers it.
+    for (int i = 0; i < 2 * nsamps; i++) {
+      const int32_t v = (int32_t)s[i] + (int32_t)tab[p & VRTSIM_NOISE_TAB_MASK];
+      s[i] = (int16_t)(v > 32767 ? 32767 : (v < -32768 ? -32768 : v));
+      p++;
+    }
+    st->rx_noise_pos[aarx & 31] = p;
+  }
+}
+
+// Cat-B STEP 0: RU UL-combine cost. Called from BOTH exits of vrtsim_read — the multi-UE
+// path returns early, and anything accounted only at the tail is invisible on the one path
+// this lab actually runs.
+static void vrtsim_catb_account(vrtsim_state_t *st, const struct timespec *t0, int nsamps, int nbAnt)
+{
+  if (!st->catb_stats)
+    return;
+  struct timespec t1;
+  clock_gettime(CLOCK_MONOTONIC, &t1);
+  const uint64_t ns = (uint64_t)(t1.tv_sec - t0->tv_sec) * 1000000000ull + (t1.tv_nsec - t0->tv_nsec);
+  st->catb_ns_acc += ns;
+  if (ns > st->catb_ns_max)
+    st->catb_ns_max = ns;
+  if ((++st->catb_calls % 1000) == 0)
+    // Cost per READ CALL, not per slot: nsamps is a fraction of a slot, so compare like for
+    // like across runs. Budget reference: TS=0.02 gives a 0.5 ms slot 25 ms of wall time.
+    LOG_I(HW,
+          "VRTSIM CATB: combine avg %.1f us, max %.1f us over %lu calls (nsamps %d, %d ant)\n",
+          st->catb_ns_acc / 1000.0 / st->catb_calls,
+          st->catb_ns_max / 1000.0,
+          (unsigned long)st->catb_calls,
+          nsamps,
+          nbAnt);
+}
+
 static int vrtsim_read(openair0_device_t *device, openair0_timestamp_t *ptimestamp, void **samplesVoid, int nsamps, int nbAnt)
 {
   vrtsim_state_t *vrtsim_state = (vrtsim_state_t *)device->priv;
@@ -1608,6 +1793,13 @@ static int vrtsim_read(openair0_device_t *device, openair0_timestamp_t *ptimesta
     }
   }
   int rx_ret = 0;
+  // Cat-B STEP 0: measure the RU's UL combine cost before spatial combining moves into it.
+  // ponytail: CLOCK_MONOTONIC around the server branch, no per-antenna breakdown — the gate
+  // only needs headroom against the 25 ms wall budget (TS=0.02 gives a 0.5 ms slot 25 ms of
+  // wall time regardless of sample rate).
+  struct timespec catb_t0;
+  if (vrtsim_state->catb_stats)
+    clock_gettime(CLOCK_MONOTONIC, &catb_t0);
   if (vrtsim_state->role == ROLE_SERVER) {
     if (vrtsim_state->num_ues > 1) {
       /* Multi-UE UL combining */
@@ -1683,6 +1875,7 @@ static int vrtsim_read(openair0_device_t *device, openair0_timestamp_t *ptimesta
                                            nsamps,
                                            u * nbAnt + a,
                                            vrtsim_state->ul_combine_buffer);
+            vrtsim_state->rx_subreads += nsamps;
             if (ret == CHANNEL_ERROR_TOO_LATE) {
               vrtsim_state->rx_samples_late += nsamps;
             } else if (ret == CHANNEL_ERROR_TOO_EARLY) {
@@ -1727,8 +1920,27 @@ static int vrtsim_read(openair0_device_t *device, openair0_timestamp_t *ptimesta
             }
           }
         }
+        // RECEIVER thermal noise: one fixed floor, added ONCE per antenna at the gNB, after
+        // all UE streams have been merged. Replaces the per-UE client-side AGC, which was
+        // wrong three ways: (a) each UE added its own realisation and the server summed them,
+        // so the floor grew +3 dB per UE doubling; (b) each UE sized its share from its own
+        // EWMA of its own signal, giving a fixed per-UE SNR asymmetry the scheduler read as a
+        // channel difference; (c) sizing noise from measured signal power makes the absolute
+        // level depend on what the run happened to transmit (measured: 7.8 dB spread, and
+        // 114 vs 155 Mbps on identical configs). Thermal noise is a property of the receiver,
+        // not of the transmitters, so it belongs here: once, per antenna, at a constant level.
+        // Independent per antenna — that independence is what produces the MRC array gain.
+        // Applied to EVERY slot including PRACH: a real receiver has no quiet slots, and
+        // gating it off would leave PRACH detection running at an unphysical infinite SNR.
+        vrtsim_add_rx_thermal_noise(vrtsim_state, samplesVoid, nbAnt, nsamps, read_sample);
         // mirror the common epilogue exactly: report the CURSOR (not read_sample = cursor +
         // ul_read_advance) or the DU's slot clock shifts by the read advance
+        // ...INCLUDING the accounting. This early return previously skipped rx_samples_total,
+        // so on the multi-UE path (every run in this lab) the realtime denominator stayed 0
+        // while rx_samples_late kept counting — the RX realtime figure was garbage, not merely
+        // mis-scaled. Same reason the Cat-B combine timer never fired: this is the hot path.
+        vrtsim_catb_account(vrtsim_state, &catb_t0, nsamps, nbAnt);
+        vrtsim_state->rx_samples_total += nsamps;
         *ptimestamp = vrtsim_state->last_received_sample;
         vrtsim_state->last_received_sample += nsamps;
         return nsamps;
@@ -1746,6 +1958,7 @@ static int vrtsim_read(openair0_device_t *device, openair0_timestamp_t *ptimesta
                                          nsamps,
                                          base + t,
                                          vrtsim_state->ul_combine_buffer);
+          vrtsim_state->rx_subreads += nsamps;
           if (ret == CHANNEL_ERROR_TOO_LATE) {
             vrtsim_state->rx_samples_late += nsamps;
           } else if (ret == CHANNEL_ERROR_TOO_EARLY) {
@@ -1909,6 +2122,7 @@ static int vrtsim_read(openair0_device_t *device, openair0_timestamp_t *ptimesta
       for (int L = 0; L < NL; L++) {
         int ret = shm_td_iq_channel_rx(vrtsim_state->channel, read_sample, nsamps, L,
                                        vrtsim_state->ul_combine_buffer + (size_t)L * nsamps);
+        vrtsim_state->rx_subreads += nsamps;
         if (ret == CHANNEL_ERROR_TOO_LATE) vrtsim_state->rx_samples_late += nsamps;
         else if (ret == CHANNEL_ERROR_TOO_EARLY) vrtsim_state->rx_early += 1;
         if (ret != 0 && rx_ret == 0) rx_ret = ret;
@@ -1942,6 +2156,7 @@ static int vrtsim_read(openair0_device_t *device, openair0_timestamp_t *ptimesta
           if (samplesVoid[aarx] == NULL)
             continue;
           int ret_a = shm_td_iq_channel_rx(vrtsim_state->channel, read_sample, nsamps, aarx, samplesVoid[aarx]);
+          vrtsim_state->rx_subreads += nsamps;
           if (ret_a == CHANNEL_ERROR_TOO_LATE)
             vrtsim_state->rx_samples_late += nsamps;
           else if (ret_a == CHANNEL_ERROR_TOO_EARLY)
@@ -1951,6 +2166,7 @@ static int vrtsim_read(openair0_device_t *device, openair0_timestamp_t *ptimesta
         }
       } else {
       int ret = shm_td_iq_channel_rx(vrtsim_state->channel, read_sample, nsamps, 0, samplesVoid[0]);
+      vrtsim_state->rx_subreads += nsamps;
       if (ret == CHANNEL_ERROR_TOO_LATE) {
         vrtsim_state->rx_samples_late += nsamps;
       } else if (ret == CHANNEL_ERROR_TOO_EARLY) {
@@ -2064,6 +2280,7 @@ static int vrtsim_read(openair0_device_t *device, openair0_timestamp_t *ptimesta
       int global_dl_ant = vrtsim_state->ue.rx_offset + aarx;
       int ret =
           shm_td_iq_channel_rx(vrtsim_state->channel, vrtsim_state->last_received_sample, nsamps, global_dl_ant, samplesVoid[aarx]);
+      vrtsim_state->rx_subreads += nsamps;
       if (ret == CHANNEL_ERROR_TOO_LATE) {
         vrtsim_state->rx_samples_late += nsamps;
       } else if (ret == CHANNEL_ERROR_TOO_EARLY) {
@@ -2071,6 +2288,7 @@ static int vrtsim_read(openair0_device_t *device, openair0_timestamp_t *ptimesta
       }
     }
   }
+  vrtsim_catb_account(vrtsim_state, &catb_t0, nsamps, nbAnt);
   vrtsim_state->rx_samples_total += nsamps;
   *ptimestamp = vrtsim_state->last_received_sample;
   vrtsim_state->last_received_sample += nsamps;
@@ -2118,10 +2336,22 @@ static void vrtsim_end(openair0_device_t *device)
   sleep(1);
   shm_td_iq_channel_destroy(vrtsim_state->channel);
 
+  // RX denominator is rx_subreads, NOT rx_samples_total: late is counted per sub-read (per UE
+  // per antenna per layer) while total counts one call, so the old ratio was inflated by the
+  // loop count (32x at 2 UEs x 16 antennas) and could exceed 100% on a healthy link.
+  const uint64_t rx_den = vrtsim_state->rx_subreads ? vrtsim_state->rx_subreads : vrtsim_state->rx_samples_total;
   LOG_I(HW,
-        "VRTSIM: Realtime issues: TX %.2f%%, RX %.2f%%\n",
+        "VRTSIM: Realtime issues: TX %.2f%%, RX %.2f%% (%lu late / %lu sub-reads)\n",
         tx_timing->tx_samples_late / (float)tx_timing->tx_samples_total * 100,
-        vrtsim_state->rx_samples_late / (float)vrtsim_state->rx_samples_total * 100);
+        vrtsim_state->rx_samples_late / (float)rx_den * 100,
+        (unsigned long)vrtsim_state->rx_samples_late,
+        (unsigned long)rx_den);
+  if (vrtsim_state->catb_stats && vrtsim_state->catb_calls)
+    LOG_I(HW,
+          "VRTSIM CATB: final combine avg %.1f us, max %.1f us over %lu calls\n",
+          vrtsim_state->catb_ns_acc / 1000.0 / vrtsim_state->catb_calls,
+          vrtsim_state->catb_ns_max / 1000.0,
+          (unsigned long)vrtsim_state->catb_calls);
   LOG_I(HW,
         "VRTSIM: Read/write too early (suspected radio implementaton error) TX: %lu, RX: %lu\n",
         tx_timing->tx_early,
