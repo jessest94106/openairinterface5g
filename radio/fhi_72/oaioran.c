@@ -106,7 +106,33 @@ static void catb_bfw_attach(struct xran_prb_elm *pRbElm)
     iq[2 * a] = rec.w[2 * k];
     iq[2 * a + 1] = rec.w[2 * k + 1];
   }
-  static int8_t extbuf[CATB_BFW_EXTBUF];
+  // The ext buffer MUST come from rte_malloc: xran_attach_cp_ext_buf() calls
+  // rte_malloc_virt2iova() on p_ext_start and rte_panic()s on a bad IOVA, so a static array
+  // would abort the DU rather than fail quietly. p_ext_section must also sit PAST a headroom
+  // gap, because xran back-steps by RTE_PKTMBUF_HEADROOM + ecpri + section1 headers to find
+  // the mbuf start. Rotating pool: each buffer is attached to an in-flight mbuf and released
+  // by xran's free callback, so reusing one buffer for every section would corrupt packets
+  // still on the wire.
+  enum { CATB_HEAD = RTE_PKTMBUF_HEADROOM + 64, CATB_POOL = 128 };
+  static int8_t *pool[CATB_POOL];
+  static int pool_idx = 0;
+  static int pool_failed = 0;
+  if (pool_failed)
+    return;
+  if (pool[0] == NULL) {
+    for (int i = 0; i < CATB_POOL; i++) {
+      pool[i] = rte_malloc(NULL, CATB_HEAD + CATB_BFW_EXTBUF, 64);
+      if (pool[i] == NULL) {
+        LOG_E(HW, "[CATB] rte_malloc failed for BFW ext buffer %d — BFW disabled\n", i);
+        pool_failed = 1;
+        return;
+      }
+    }
+    LOG_A(HW, "[CATB] BFW ext pool: %d x %d B from rte_malloc\n", CATB_POOL, (int)(CATB_HEAD + CATB_BFW_EXTBUF));
+  }
+  int8_t *const base = pool[pool_idx];
+  pool_idx = (pool_idx + 1) % CATB_POOL;
+  int8_t *const extbuf = base + CATB_HEAD;
   pRbElm->bf_weight.nAntElmTRx = nant;
   pRbElm->bf_weight.bfwIqWidth = 16; // uncompressed to start; this is the BFW compression knob
   pRbElm->bf_weight.bfwCompMeth = XRAN_BFWCOMPMETHOD_NONE; // BLKSCALE/ULAW/BEAMSPACE rte_panic()
@@ -124,8 +150,13 @@ static void catb_bfw_attach(struct xran_prb_elm *pRbElm)
       LOG_E(HW, "[CATB] xran_cp_populate_section_ext_1 returned %d — BFW not attached\n", len);
     return;
   }
+  pRbElm->bf_weight.p_ext_start = base; // rte_malloc base — xran takes its IOVA from this
   pRbElm->bf_weight.p_ext_section = extbuf;
   pRbElm->bf_weight.ext_section_sz = (int16_t)len;
+  // The TX path reads the width/compression from the PRB ELEMENT, not from bf_weight
+  // (xran_cp_proc.c:522-523), so setting only the bf_weight copies has no effect.
+  pRbElm->iqWidth = 16;
+  pRbElm->compMethod = XRAN_BFWCOMPMETHOD_NONE;
   { static long n = 0; if ((n++ % 20000) == 0) LOG_I(HW, "[CATB] BFW attached, ext len %d, %d ant\n", len, nant); }
 }
 // ----------------------------------------------------------------------------------------
