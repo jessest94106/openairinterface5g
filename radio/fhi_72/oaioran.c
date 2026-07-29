@@ -106,78 +106,42 @@ static void catb_bfw_attach(struct xran_prb_elm *pRbElm)
     iq[2 * a] = rec.w[2 * k];
     iq[2 * a + 1] = rec.w[2 * k + 1];
   }
-  // The ext buffer MUST come from rte_malloc: xran_attach_cp_ext_buf() calls
-  // rte_malloc_virt2iova() on p_ext_start and rte_panic()s on a bad IOVA, so a static array
-  // would abort the DU rather than fail quietly. p_ext_section must also sit PAST a headroom
-  // gap, because xran back-steps by RTE_PKTMBUF_HEADROOM + ecpri + section1 headers to find
-  // the mbuf start. Rotating pool: each buffer is attached to an in-flight mbuf and released
-  // by xran's free callback, so reusing one buffer for every section would corrupt packets
-  // still on the wire.
-  // Headroom and total size both generous. xran back-steps from p_ext_section by
-  // RTE_PKTMBUF_HEADROOM + ecpri_hdr + section1_header AND extends the claimed mbuf length by
-  // the same plus 18 — so the attachment reads and DMAs OUTSIDE the region we sized for the
-  // payload alone. Undersizing produced a segfault in libxran at a sign-extended (negative)
-  // address from L1_tx_thread. 1 KB head + 4 KB body leaves room for both directions.
-  enum { CATB_HEAD = 1024, CATB_BODY = 4096, CATB_POOL = 128 };
-  static int8_t *pool[CATB_POOL];
-  static int pool_idx = 0;
-  static int pool_failed = 0;
-  if (pool_failed)
-    return;
-  if (pool[0] == NULL) {
-    for (int i = 0; i < CATB_POOL; i++) {
-      pool[i] = rte_malloc(NULL, CATB_HEAD + CATB_BODY, 64);
-      if (pool[i]) memset(pool[i], 0, CATB_HEAD + CATB_BODY);
-      if (pool[i] == NULL) {
-        LOG_E(HW, "[CATB] rte_malloc failed for BFW ext buffer %d — BFW disabled\n", i);
-        pool_failed = 1;
-        return;
-      }
-    }
-    LOG_A(HW, "[CATB] BFW ext pool: %d x %d B from rte_malloc\n", CATB_POOL, (int)(CATB_HEAD + CATB_BODY));
-  }
-  // atomic: the C-plane loop runs per antenna per symbol and may be threaded; two sections
-  // sharing a buffer while both mbufs are in flight would corrupt packets.
-  const int slot_i = __atomic_fetch_add(&pool_idx, 1, __ATOMIC_RELAXED) % CATB_POOL;
-  int8_t *const base = pool[slot_i];
-  // LAYOUT (xran_cp_proc.c:526-528 + ONE_EXT_LEN/ONE_CPSEC_EXT_LEN in xran_cp_proc.h):
-  //   ext1.p_bfwIQ  = p_ext_section + sizeof(section1)
-  //   ext1.bfwIQ_sz = ext_section_sz - sizeof(section1)
-  // so the buffer must be [ sizeof(section1) bytes reserved ][ populate() output ], and
-  // ext_section_sz must COUNT that reserved header. Writing populate's output at offset 0
-  // and declaring only its own length made xran read from +8 with size-8 — i.e. from the
-  // middle of the ext1 header — which is what killed the DU.
-  int8_t *const extbuf = base + CATB_HEAD + sizeof(struct xran_cp_radioapp_section1);
+  // EXACT pattern from the xran sample app (app/src/app_io_fh_xran.c:1042) — the canonical
+  // working caller. Six earlier attempts diverged from it on every point that matters:
+  // xran_malloc (not rte_malloc: different pool/registration), buffer sized to the MTU,
+  // headroom exactly HEADROOM+ecpri+section1_header, p_ext_section = start+headroom, and
+  // ext_section_sz = populate()'s RAW return (an earlier "fix" added sizeof(section1) to it,
+  // which was a misreading of ONE_EXT_LEN).
+  const uint32_t mtu = 9600;
   pRbElm->bf_weight.nAntElmTRx = nant;
-  pRbElm->bf_weight.bfwIqWidth = 16; // uncompressed to start; this is the BFW compression knob
-  pRbElm->bf_weight.bfwCompMeth = XRAN_BFWCOMPMETHOD_NONE; // BLKSCALE/ULAW/BEAMSPACE rte_panic()
+  pRbElm->bf_weight.bfwIqWidth = 16;
+  pRbElm->bf_weight.bfwCompMeth = XRAN_BFWCOMPMETHOD_NONE;
   pRbElm->bf_weight.numSetBFWs = 1;
-  pRbElm->bf_weight.numBundPrb = 0; // 0 => ext-1 rather than ext-11
+  pRbElm->bf_weight.numBundPrb = 0;
   pRbElm->bf_weight.extType = 1;
-  // Required for xran to emit weights rather than a beam index — without it the section stays
-  // index-based (XRAN_BEAM_ID_BASED=0) and the extension is never attached.
   pRbElm->BeamFormingType = XRAN_BEAM_WEIGHT;
-  // MANDATORY and easy to miss: xran gates ext-1 SECTION PREPARATION on this
-  // (xran_cp_proc.c:513 "if((category == XRAN_CATEGORY_B) && (pPrbMapElem->bf_weight_update))")
-  // while the ext-buffer ATTACH at :570 is gated only on extType==1. Setting extType without
-  // this makes xran attach a buffer whose section content was never prepared — a malformed
-  // C-plane packet handed to the NIC, which killed the DU outright in three earlier attempts.
   pRbElm->bf_weight_update = 1;
-  pRbElm->bf_weight.maxExtBufSize = CATB_BFW_EXTBUF;
-  const int32_t len = xran_cp_populate_section_ext_1(extbuf, CATB_BFW_EXTBUF, iq, pRbElm);
+  pRbElm->iqWidth = 16;
+  pRbElm->compMethod = XRAN_BFWCOMPMETHOD_NONE;
+  int16_t ext_len = pRbElm->bf_weight.maxExtBufSize = mtu;
+  int8_t *ext_buf = pRbElm->bf_weight.p_ext_start ? (int8_t *)pRbElm->bf_weight.p_ext_start
+                                                  : (int8_t *)xran_malloc(mtu);
+  if (ext_buf == NULL)
+    return;
+  int8_t *const ext_buf_start = ext_buf;
+  const int hdr = RTE_PKTMBUF_HEADROOM + sizeof(struct xran_ecpri_hdr) + sizeof(struct xran_cp_radioapp_section1_header);
+  ext_buf += hdr;
+  ext_len -= hdr;
+  const int32_t len = xran_cp_populate_section_ext_1(ext_buf, ext_len, iq, pRbElm);
   if (len <= 0) {
     static int warned = 0;
     if (!warned++)
-      LOG_E(HW, "[CATB] xran_cp_populate_section_ext_1 returned %d — BFW not attached\n", len);
+      LOG_E(HW, "[CATB] populate_section_ext_1 -> %d\n", len);
     return;
   }
-  pRbElm->bf_weight.p_ext_start = base; // rte_malloc base — xran takes its IOVA from this
-  pRbElm->bf_weight.p_ext_section = base + CATB_HEAD; // section1 slot first, IQ after it
-  pRbElm->bf_weight.ext_section_sz = (int16_t)(len + sizeof(struct xran_cp_radioapp_section1));
-  // The TX path reads the width/compression from the PRB ELEMENT, not from bf_weight
-  // (xran_cp_proc.c:522-523), so setting only the bf_weight copies has no effect.
-  pRbElm->iqWidth = 16;
-  pRbElm->compMethod = XRAN_BFWCOMPMETHOD_NONE;
+  pRbElm->bf_weight.p_ext_start = ext_buf_start;
+  pRbElm->bf_weight.p_ext_section = ext_buf;
+  pRbElm->bf_weight.ext_section_sz = (int16_t)len;
   { static long n = 0; if ((n++ % 20000) == 0) LOG_I(HW, "[CATB] BFW attached, ext len %d, %d ant\n", len, nant); }
 }
 // ----------------------------------------------------------------------------------------
