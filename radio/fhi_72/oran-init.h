@@ -31,6 +31,14 @@ typedef struct oran_bufs {
   struct xran_flat_buffer rx[XRAN_MAX_ANTENNA_NR][XRAN_N_FE_BUF_LEN][XRAN_NUM_OF_SYMBOL_PER_SLOT];
   struct xran_flat_buffer rx_prbmap[XRAN_MAX_ANTENNA_NR][XRAN_N_FE_BUF_LEN];
 
+  // Cat-B 3a.2: BFW reception needs its OWN C-plane PRB maps. xran_5g_bfw_config() copies the
+  // list into sFHCpRxPrbMapBbuIoBufCtrl (xran_main.c:2135) and xran then writes received weight
+  // sections into it (xran_cp_api.c:2737). Passing rx_prbmap/tx_prbmap — already given to
+  // xran_5g_fronthault_config() — corrupts the live U-plane map: attach 0/2. The xran sample app
+  // keeps four separate maps (app_io_fh_xran.c:700-780); this is the missing pair.
+  struct xran_flat_buffer bfw_rx_prbmap[XRAN_MAX_ANTENNA_NR][XRAN_N_FE_BUF_LEN];
+  struct xran_flat_buffer bfw_tx_prbmap[XRAN_MAX_ANTENNA_NR][XRAN_N_FE_BUF_LEN];
+
   struct xran_flat_buffer prach[XRAN_MAX_ANTENNA_NR][XRAN_N_FE_BUF_LEN][XRAN_NUM_OF_SYMBOL_PER_SLOT];
   struct xran_flat_buffer prachdecomp[XRAN_MAX_ANTENNA_NR][XRAN_N_FE_BUF_LEN][XRAN_NUM_OF_SYMBOL_PER_SLOT];
 } oran_bufs_t;
@@ -41,6 +49,9 @@ typedef struct oran_buf_list {
   struct xran_buffer_list srccp[XRAN_MAX_ANTENNA_NR][XRAN_N_FE_BUF_LEN];
   struct xran_buffer_list dst[XRAN_MAX_ANTENNA_NR][XRAN_N_FE_BUF_LEN];
   struct xran_buffer_list dstcp[XRAN_MAX_ANTENNA_NR][XRAN_N_FE_BUF_LEN];
+
+  struct xran_buffer_list bfwrxcp[XRAN_MAX_ANTENNA_NR][XRAN_N_FE_BUF_LEN];
+  struct xran_buffer_list bfwtxcp[XRAN_MAX_ANTENNA_NR][XRAN_N_FE_BUF_LEN];
 
   struct xran_buffer_list prachdst[XRAN_MAX_ANTENNA_NR][XRAN_N_FE_BUF_LEN];
   struct xran_buffer_list prachdstdecomp[XRAN_MAX_ANTENNA_NR][XRAN_N_FE_BUF_LEN];
@@ -55,6 +66,7 @@ typedef struct oran_port_instance_t {
 
   struct xran_cb_tag prach_tag;
   struct xran_cb_tag pusch_tag;
+  struct xran_cb_tag bfw_tag; // Cat-B 3a.2: own tag, as the sample app does (BfwCbTag)
 } oran_port_instance_t;
 
 extern struct xran_fh_config gxran_fh_config[XRAN_PORTS_NUM];

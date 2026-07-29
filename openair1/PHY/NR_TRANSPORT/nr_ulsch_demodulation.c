@@ -792,7 +792,110 @@ static void catb_publish_weights(catb_weight_ring_t *ring,
 // MMSE Rx function: nr_ulsch_mmse_2layers()
 // Cat-B: delayed channel-estimate view, published per UE per antenna. Read-only for
 // consumers; NULL means "use the live estimate".
-static int32_t *catb_hview[8][16];
+// STEP 4 ring: keyed by REAL ulsch_id. gNB->max_nb_pusch = MAX_MOBILES_PER_GNB * buffer_ul_slots
+// (nr_init.c:467) and measures 144 in this lab, so the old `% 8` aliased 18 distinct decodes onto
+// each slot: writes and reads landed in different UEs' entries, `view` came out (nil) in every
+// sample, and the delayed estimate was NEVER delivered. Every previous "failure" was this block's
+// own malloc/memcpy cost, not staleness.
+// Key by RNTI, NOT ulsch_id. ulsch_id is a rotating index into a pool of gNB->max_nb_pusch (=144
+// here) decode slots, reassigned per grant, so the SAME UE gets a DIFFERENT ulsch_id every slot:
+// keying by it writes each entry once and never builds that UE's history, and the delayed read
+// returns another UE's leftovers (measured: view non-nil but the partner checksum ~0). RNTI is the
+// stable per-UE identity across slots.
+#define CATB_MAX_UE 8
+static int32_t *catb_hview[CATB_MAX_UE][16];
+
+// Dense slot for an RNTI, assigned on first sight. Linear scan over <=8 entries; this runs once
+// per slot per UE, not per RE.
+static int catb_ue_slot(uint16_t rnti)
+{
+  static uint16_t seen[CATB_MAX_UE];
+  static int n = 0;
+  if (rnti == 0)
+    return -1;
+  for (int i = 0; i < n; i++)
+    if (seen[i] == rnti)
+      return i;
+  if (n >= CATB_MAX_UE)
+    return -1;
+  seen[n] = rnti;
+  return n++;
+}
+
+// ---- Cat-B 3a.3 DU side: receive already-combined data symbols -----------------------------
+// The RU combines 16 antennas into ONE stream on DATA symbols (nr-oru.c receive_pusch_catb) and
+// leaves REFERENCE symbols per-antenna so the DU can still estimate H and keep computing weights.
+// So on data symbols the DU has y = w^H x on eAxC 0 only, while H is 16x1 from the reference
+// symbols. The fix needs NO extra fronthaul: the DU already knows w because it published it.
+// Build the effective 1-antenna channel locally,  h_eff = sum_a conj(w[a]) * H[a],  and run the
+// existing receiver with nb_rx_ant == 1 for that symbol.
+static int catb_ul_rx_enabled(void)
+{
+  static int en = -1;
+  if (en < 0) {
+    const char *e = getenv("OAI_CATB_UL_RX");
+    en = (e && e[0] && e[0] != '0') ? 1 : 0;
+    if (en)
+      LOG_A(PHY, "[CATB DU] combined-UL receive mode ON (data symbols = 1 effective antenna)\n");
+  }
+  return en;
+}
+
+// Read back the weights this DU most recently published. Same wideband mid-band PRB, layer 0
+// that oaioran.c catb_bfw_attach() puts on the wire, so the DU reconstructs exactly the vector
+// the RU applied. Returns antenna count, 0 if the ring has nothing yet.
+static int catb_read_last_weights(int16_t *out, int max_ant)
+{
+  static catb_weight_ring_t *ring = NULL;
+  static long tries = 0;
+  if (ring == NULL) {
+    // Retry, do not latch: the ring is created by the export path on its first MU-IRC decode.
+    if ((tries++ % 2000) != 0)
+      return 0;
+    ring = catb_ring_open(0);
+    if (ring == NULL)
+      return 0;
+    LOG_A(PHY, "[CATB DU] weight ring mapped for receive after %ld attempts\n", tries);
+  }
+  catb_weight_rec_t rec;
+  if (!catb_ring_read(ring, 0, &rec) || rec.n_ant == 0)
+    return 0;
+  const int n = (rec.n_ant < max_ant) ? rec.n_ant : max_ant;
+  const int prb = rec.n_prb / 2;
+  for (int a = 0; a < n; a++) {
+    const size_t k = catb_w_index(prb, 0, a, rec.n_layers, rec.n_ant);
+    out[2 * a] = rec.w[2 * k];
+    out[2 * a + 1] = rec.w[2 * k + 1];
+  }
+  return n;
+}
+
+// Must match nr-oru.c catb_is_ref_symbol() and VRTSIM_CATB_REF_SYMS. Default 2,7,11.
+static int catb_du_is_ref_symbol(int symbol)
+{
+  static int inited = 0;
+  static uint16_t mask = 0;
+  if (!inited) {
+    inited = 1;
+    const char *e = getenv("VRTSIM_CATB_REF_SYMS");
+    if (e && e[0]) {
+      const char *p = e;
+      while (*p) {
+        int v = atoi(p);
+        if (v >= 0 && v < 14)
+          mask |= (uint16_t)(1u << v);
+        while (*p && *p != ',')
+          p++;
+        if (*p == ',')
+          p++;
+      }
+    }
+    if (mask == 0)
+      mask = (1u << 2) | (1u << 7) | (1u << 11);
+    LOG_A(PHY, "[CATB DU] reference symbol mask 0x%04x\n", mask);
+  }
+  return (mask >> symbol) & 1;
+}
 
 static uint8_t nr_ulsch_mmse_2layers(int **rxdataF_comp,
                                      uint32_t buffer_length,
@@ -1023,7 +1126,13 @@ static void inner_rx(PHY_VARS_gNB *gNB,
                      c16_t *chFext_slot)
 {
   int nb_layer = rel15_ul->nrOfLayers;
-  int nb_rx_ant = frame_parms->nb_antennas_rx;
+  const int nb_rx_ant_true = frame_parms->nb_antennas_rx;
+  // On Cat-B DATA symbols the wire carries ONE combined stream, so the receiver runs at 1
+  // antenna. Every VLA below and every downstream call is sized from nb_rx_ant, so switching it
+  // here keeps the whole path self-consistent. ul_ch_estimates[] is still stored per REAL
+  // antenna, so its indexing must use nb_rx_ant_true.
+  const int catb_comb = catb_ul_rx_enabled() && !catb_du_is_ref_symbol(symbol);
+  int nb_rx_ant = catb_comb ? 1 : nb_rx_ant_true;
   // ---- Cat-B STEP 4 CORE: WEIGHT STALENESS at the SOURCE (OAI_CATB_DELAY_SLOTS=d) --------
   // Delay the CHANNEL ESTIMATE itself, before anything reads it. An earlier version swapped
   // only the MMSE receiver's copy (chF2) and produced a flat ~98% collapse at EVERY delay:
@@ -1042,10 +1151,21 @@ static void inner_rx(PHY_VARS_gNB *gNB,
         LOG_A(PHY, "[CATB] weight staleness %d slots (%.1f ms sim), applied at the estimate\n", cdelay, cdelay * 0.5);
     }
     if (cdelay > 0 && symbol == rel15_ul->start_symbol_index) { // once per slot, not per symbol
-      enum { CR = 64, CU = 8 };
+      // Ring depth must be d+1, not 64. At 64 this allocated ~114 kB per antenna per slot
+      // x16 antennas x64 slots x2 UEs ~= 234 MB of malloc inside the real-time decode path,
+      // with ~1.8 MB of memcpy per slot per UE on top. That starves the slot deadline whatever
+      // the contents are — which is exactly the "destructive whenever active" signature seen
+      // on a static channel, where the substituted data is byte-identical to the live data.
+      const int CR = (cdelay < 63) ? (cdelay + 1) : 64;
+      enum { CU = CATB_MAX_UE, CRMAX = 64 };
       const size_t one = sizeof(int32_t) * frame_parms->ofdm_symbol_size * frame_parms->symbols_per_slot;
-      const int ue = ulsch_id % CU, d = (cdelay < CR) ? cdelay : CR - 1;
-      static int32_t *ring[CU][CR][16];
+      // Key by the decode's real identity (RNTI). Unknown/overflow => skip, so the mechanism
+      // degrades to "no delay" instead of silently mixing UEs.
+      const int ue = catb_ue_slot(rel15_ul->rnti);
+      if (ue < 0)
+        goto catb_ring_done;
+      const int d = (cdelay < CR) ? cdelay : CR - 1;
+      static int32_t *ring[CU][CRMAX][16];
       static int pos[CU], filled[CU];
       const int wr = pos[ue] % CR;
       for (int a = 0; a < nb_rx_ant && a < 16; a++) {
@@ -1067,6 +1187,7 @@ static void inner_rx(PHY_VARS_gNB *gNB,
         for (int a = 0; a < nb_rx_ant && a < 16; a++)
           catb_hview[ue][a] = ring[ue][rd][a];
       }
+catb_ring_done:;
     }
   }
   // ----------------------------------------------------------------------------------------
@@ -1085,10 +1206,62 @@ static void inner_rx(PHY_VARS_gNB *gNB,
     dmrs_symbol = get_next_dmrs_symbol_in_slot(rel15_ul->ul_dmrs_symb_pos, rel15_ul->start_symbol_index, end_symbol);
   }
 
+  if (catb_comb) {
+    // Effective 1-antenna receive. rxF[0] holds the RU-combined stream; chFext[l][0] becomes
+    // h_eff = sum_a conj(w[a]) * H[l][a], using the weights this DU published for this slot.
+    int16_t w[CATB_MAX_ANT * 2];
+    const int n_w = catb_read_last_weights(w, nb_rx_ant_true);
+    c16_t tmp[buffer_length] __attribute__((aligned(32)));
+    c16_t dump[buffer_length] __attribute__((aligned(32)));
+    for (int aatx = 0; aatx < nb_layer; aatx++) {
+      int32_t acc_r[buffer_length], acc_i[buffer_length];
+      memset(acc_r, 0, sizeof(acc_r));
+      memset(acc_i, 0, sizeof(acc_i));
+      for (int a = 0; a < nb_rx_ant_true; a++) {
+        // Extract this antenna's channel estimate. rxFext is written only on a == 0 (the
+        // combined stream); later antennas dump theirs, we only want their channel.
+        nr_ulsch_extract_rbs(rxF[0],
+                             (c16_t *)pusch_vars->ul_ch_estimates[aatx * nb_rx_ant_true + a],
+                             (a == 0) ? rxFext[0] : dump,
+                             tmp,
+                             soffset + (symbol * frame_parms->ofdm_symbol_size),
+                             dmrs_symbol * frame_parms->ofdm_symbol_size,
+                             0,
+                             dmrs_symbol_flag,
+                             rel15_ul,
+                             frame_parms);
+        // No weights yet -> fall back to plain MRC combining weights (conj(H) applied later),
+        // i.e. treat w as unit on antenna 0 only. Counted below so it is never silent.
+        const int32_t wr = (n_w > a) ? w[2 * a] : ((a == 0) ? 32767 : 0);
+        const int32_t wi = (n_w > a) ? w[2 * a + 1] : 0;
+        for (int i = 0; i < (int)buffer_length; i++) {
+          acc_r[i] += ((int32_t)tmp[i].r * wr + (int32_t)tmp[i].i * wi) >> 15;
+          acc_i[i] += ((int32_t)tmp[i].i * wr - (int32_t)tmp[i].r * wi) >> 15;
+        }
+      }
+      for (int i = 0; i < (int)buffer_length; i++) {
+        chFext[aatx][0][i].r = (int16_t)(acc_r[i] > 32767 ? 32767 : (acc_r[i] < -32768 ? -32768 : acc_r[i]));
+        chFext[aatx][0][i].i = (int16_t)(acc_i[i] > 32767 ? 32767 : (acc_i[i] < -32768 ? -32768 : acc_i[i]));
+      }
+    }
+    static long n_eff = 0, n_now = 0;
+    if (n_w <= 0)
+      n_now++;
+    if ((n_eff++ % 20000) == 0)
+      LOG_A(PHY, "[CATB DU] effective-channel symbols=%ld no_weights=%ld\n", n_eff, n_now);
+  } else
   for (int aarx = 0; aarx < nb_rx_ant; aarx++) {
     for (int aatx = 0; aatx < nb_layer; aatx++) {
+      // STEP 4: the SELF leg must be delayed too. W = f(H_self, H_partner), so delaying only the
+      // partner's estimate (which is all the IRC block below did) models half the staleness and
+      // the equivalence "delaying H == delaying W" does not hold. The ring stores layer 0's
+      // nb_rx_ant estimates, so this substitution is valid for the 1-layer-per-UE case this
+      // experiment runs; higher nb_layer falls through to the live estimate.
+      const int self_slot = (aatx == 0) ? catb_ue_slot(rel15_ul->rnti) : -1;
+      int32_t *self_hv = (self_slot >= 0) ? catb_hview[self_slot][aarx] : NULL;
       nr_ulsch_extract_rbs(rxF[aarx],
-                           (c16_t *)pusch_vars->ul_ch_estimates[aatx * nb_rx_ant + aarx],
+                           self_hv ? (c16_t *)self_hv
+                                   : (c16_t *)pusch_vars->ul_ch_estimates[aatx * nb_rx_ant_true + aarx],
                            rxFext[aarx],
                            chFext[aatx][aarx],
                            soffset+(symbol * frame_parms->ofdm_symbol_size),
@@ -1134,6 +1307,7 @@ static void inner_rx(PHY_VARS_gNB *gNB,
     // IRC corrupts RA -> endless PRACH-retry storm. This is the scheduler->PHY co-sched marker.
     extern volatile int g_mu_mimo_active;
     int partner = -1;
+    uint16_t partner_rnti = 0;
     // Only fire on genuine co-scheduled DATA: MU regime active, large allocation, distinct rnti,
     // matching PRBs. Prevents the IRC mis-pairing during attach that breaks decode.
     // nb_rx_ant >= 2 REQUIRED: the 2-layer joint detector is degenerate at 1 antenna (can't
@@ -1194,6 +1368,7 @@ static void inner_rx(PHY_VARS_gNB *gNB,
         if (p->rnti == rel15_ul->rnti) { ps_rnti++; continue; }
         {
           partner = id;
+          partner_rnti = p->rnti; // Cat-B STEP 4: RNTI is the ring key, ulsch_id is not stable
           ps_hit++;
           if ((ps_log++ % 2000) == 0)
             LOG_E(PHY, "[MU PSCAN] HIT id=%d rnti=%04x (null=%ld fs=%ld rb=%ld rnti=%ld hit=%ld)\n",
@@ -1240,10 +1415,34 @@ static void inner_rx(PHY_VARS_gNB *gNB,
       // filled above. Only extract the PARTNER channel into chF2[1]. chF2[0] = self.
       for (int aarx = 0; aarx < nb_rx_ant; aarx++) {
         memcpy(chF2[0][aarx], chFext[0][aarx], buffer_length * sizeof(c16_t));
-        { int32_t *hv = catb_hview[ulsch_id % 8][aarx];
+        // Keyed by PARTNER, not self: this substitutes pv_p->ul_ch_estimates, which belongs to
+        // the partner. Keying by ulsch_id fed UE A's channel in where UE B's belonged — a
+        // cross-UE swap wearing a delay's clothing, and one that PASSES a "view != nil" gate.
+        // Keyed by the PARTNER's RNTI: this substitutes pv_p->ul_ch_estimates, which is the
+        // partner's channel. Keying by self fed UE A's channel where UE B's belonged — a cross-UE
+        // swap that still PASSES a "view != nil" gate.
+        const int p_slot = catb_ue_slot(partner_rnti);
+        { int32_t *hv = (p_slot >= 0) ? catb_hview[p_slot][aarx] : NULL;
           nr_ulsch_extract_rbs(rxF[aarx], (c16_t *)(hv ? hv : pv_p->ul_ch_estimates[aarx]), dummy, chF2[1][aarx],
                              soffset + (symbol * frame_parms->ofdm_symbol_size), dmrs_symbol * frame_parms->ofdm_symbol_size,
                              aarx, dmrs_symbol_flag, rel15_ul, frame_parms); }
+      }
+      // CATB CHECKSUM: what does the receiver actually see, delay on vs off? On a static
+      // channel these MUST be identical between d=0 and d>0 — identical checksums mean the
+      // redirect never lands and the damage is elsewhere in the block; differing ones locate
+      // it in the substitution itself.
+      {
+        static long ck = 0;
+        if ((ck++ % 4000) == 0) {
+          long c0 = 0, c1 = 0;
+          for (int i = 0; i < (int)buffer_length; i++) {
+            c0 += abs(chF2[0][0][i].r) + abs(chF2[0][0][i].i);
+            c1 += abs(chF2[1][0][i].r) + abs(chF2[1][0][i].i);
+          }
+          LOG_I(PHY, "[CATB CK] ulsch %d sym %d rb %d+%d self=%ld partner=%ld view=%p\n",
+                ulsch_id, symbol, rel15_ul->rb_start, rel15_ul->rb_size, c0, c1,
+                (void *)((catb_ue_slot(partner_rnti) >= 0) ? catb_hview[catb_ue_slot(partner_rnti)][0] : NULL));
+        }
       }
       { // diagnostic: is the (normal) self channel estimate non-zero here?
         static int cd = 0;

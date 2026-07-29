@@ -125,6 +125,8 @@ typedef struct {
 
 extern void tx_rf_symbols(RU_t *ru, int frame, int slot, uint64_t timestamp, int start_symbol, int num_symbols);
 static void receive_pusch(void *args);
+static void receive_pusch_catb(void *args); // Cat-B 3a.3: per-symbol job, combines antennas
+static int catb_ul_enabled(void);
 
 extern void rx_nr_prach_ru_internal(prach_item_t *p,
                                     int beam_id,
@@ -889,15 +891,27 @@ void *oru_south_read_thread(void *arg)
         if (prach_symbol != -1) {
           receive_prach(oru, frame, slot, prach_symbol);
         }
-        for (int aarx = 0; aarx < fp->nb_antennas_rx; aarx++) {
+        if (catb_ul_enabled()) {
+          // Cat-B: one job per SYMBOL (it FFTs all antennas internally and combines).
           pusch_symbol_job_t *job = &pusch_job_pool[pusch_job_index++ % max_pusch_jobs];
           job->oru = oru;
-          job->aarx = aarx;
+          job->aarx = 0;
           job->frame = frame;
           job->slot = slot;
           job->symbol = symbol;
-          task_t task = {.func = receive_pusch, .args = job};
+          task_t task = {.func = receive_pusch_catb, .args = job};
           pushTpool(&oru->tpool, task);
+        } else {
+          for (int aarx = 0; aarx < fp->nb_antennas_rx; aarx++) {
+            pusch_symbol_job_t *job = &pusch_job_pool[pusch_job_index++ % max_pusch_jobs];
+            job->oru = oru;
+            job->aarx = aarx;
+            job->frame = frame;
+            job->slot = slot;
+            job->symbol = symbol;
+            task_t task = {.func = receive_pusch, .args = job};
+            pushTpool(&oru->tpool, task);
+          }
         }
         stop_meas(&oru->rx);
       }
@@ -1169,6 +1183,71 @@ void prepare_prach_item(ORU_t *oru)
   }
 }
 
+// ---- Cat-B 3a.3: UL combining at the O-RU ------------------------------------------------
+// Weights are parsed from the UL C-plane ext-1 in oaioran_ru.c and reach us through the device
+// interface (ru->ifdevice.xran_api.read_bfw). NOT a direct symbol reference: nr-oru loads
+// liboran_fhlib_5g at RUNTIME via shlib_loader, so a direct call fails to link.
+
+// Is this a REFERENCE symbol? Those stay per-antenna: the DU cannot estimate the channel from
+// combined data, so the weight loop would stop closing. VRTSIM_CATB_REF_SYMS overrides, default
+// 2,7,11 (matches the symbol map validated in STEP 1).
+static int catb_is_ref_symbol(int symbol)
+{
+  static int inited = 0;
+  static uint16_t mask = 0;
+  if (!inited) {
+    inited = 1;
+    const char *e = getenv("VRTSIM_CATB_REF_SYMS");
+    if (e && e[0]) {
+      const char *p = e;
+      while (*p) {
+        int v = atoi(p);
+        if (v >= 0 && v < 14)
+          mask |= (uint16_t)(1u << v);
+        while (*p && *p != ',')
+          p++;
+        if (*p == ',')
+          p++;
+      }
+    }
+    if (mask == 0)
+      mask = (1u << 2) | (1u << 7) | (1u << 11);
+    LOG_A(PHY, "[CATB UL] reference symbols mask 0x%04x\n", mask);
+  }
+  return (mask >> symbol) & 1;
+}
+
+static int catb_ul_enabled(void)
+{
+  static int en = -1;
+  if (en < 0) {
+    const char *e = getenv("VRTSIM_CATB_UL");
+    en = (e && e[0] && e[0] != '0') ? 1 : 0;
+    LOG_A(PHY, "[CATB UL] RU combining %s\n", en ? "ON" : "off");
+  }
+  return en;
+}
+
+// Q15 complex MAC, the transpose of apply_codebook_weights() (nr-oru.c:601): that one spreads
+// nb_fh streams onto nb_tx antennas for DL; this one collapses nb_rx antennas onto one layer.
+// Accumulate in int32 and saturate once at the end — a per-term >>15 into int16 (as the DL
+// kernel does) loses ~4 bits when summing 16 antennas.
+static void catb_combine_ul(c16_t *const *rxdataF_ant, c16_t *out, int n_ant, int n_re, const int16_t *w)
+{
+  for (int re = 0; re < n_re; re++) {
+    int32_t acc_r = 0, acc_i = 0;
+    for (int a = 0; a < n_ant; a++) {
+      const int32_t xr = rxdataF_ant[a][re].r, xi = rxdataF_ant[a][re].i;
+      const int32_t wr = w[2 * a], wi = w[2 * a + 1];
+      // conjugate weight: MRC/MMSE combining is w^H x
+      acc_r += (xr * wr + xi * wi) >> 15;
+      acc_i += (xi * wr - xr * wi) >> 15;
+    }
+    out[re].r = (int16_t)(acc_r > 32767 ? 32767 : (acc_r < -32768 ? -32768 : acc_r));
+    out[re].i = (int16_t)(acc_i > 32767 ? 32767 : (acc_i < -32768 ? -32768 : acc_i));
+  }
+}
+
 static void receive_pusch(void *args)
 {
   pusch_symbol_job_t *job = args;
@@ -1190,4 +1269,85 @@ static void receive_pusch(void *args)
                               slot,
                               symbol);
   ru->ifdevice.xran_api.write_pusch((uint32_t *)rxdataF, aarx, frame, slot, symbol);
+}
+
+// Cat-B path: ONE JOB PER SYMBOL. FFTs every antenna, then either forwards all of them
+// (reference symbol) or combines to a single layer (data symbol). Chosen over an atomic counter
+// + staging buffer + join barrier because symbols still run in parallel; only antenna-level
+// parallelism within a symbol is given up. STEP 0 measured 34% worst-case budget at 106 PRB.
+static void receive_pusch_catb(void *args)
+{
+  pusch_symbol_job_t *job = args;
+  ORU_t *oru = job->oru;
+  int frame = job->frame;
+  int slot = job->slot;
+  int symbol = job->symbol;
+  RU_t *ru = oru->ru;
+  NR_DL_FRAME_PARMS *fp = ru->nr_frame_parms;
+  const int n_ant = fp->nb_antennas_rx;
+
+  // 16 antennas x 4096 REs x 4 B = 256 kB. This must live neither on the stack nor in static TLS:
+  //  - VLA on the stack overflowed the threadpool worker stack (dmesg: ru_thread segfault).
+  //  - `static __thread` of the same size overflowed the STATIC TLS block, which glibc carves out
+  //    of each thread's allocation, so the RU then died during thread creation at startup —
+  //    before the dispatcher ever ran.
+  // Keep only a POINTER in TLS and heap-allocate once per worker thread.
+  enum { CATB_MAX_ANT = 16, CATB_MAX_FFT = 4096 };
+  static __thread c16_t *tls_buf = NULL; // [CATB_MAX_ANT+1][CATB_MAX_FFT], last row = combined
+  AssertFatal(n_ant <= CATB_MAX_ANT && fp->ofdm_symbol_size <= CATB_MAX_FFT,
+              "Cat-B UL combine: n_ant %d (max %d) ofdm_symbol_size %d (max %d)\n",
+              n_ant, CATB_MAX_ANT, fp->ofdm_symbol_size, CATB_MAX_FFT);
+  if (tls_buf == NULL) {
+    // ponytail: never freed — worker threads live for the process.
+    tls_buf = aligned_alloc(32, (size_t)(CATB_MAX_ANT + 1) * CATB_MAX_FFT * sizeof(c16_t));
+    AssertFatal(tls_buf != NULL, "Cat-B UL combine: out of memory\n");
+  }
+  c16_t (*rxdataF)[CATB_MAX_FFT] = (c16_t (*)[CATB_MAX_FFT])tls_buf;
+  c16_t *combined_buf = tls_buf + (size_t)CATB_MAX_ANT * CATB_MAX_FFT;
+  c16_t *ant_ptr[CATB_MAX_ANT];
+  for (int a = 0; a < n_ant; a++) {
+    ant_ptr[a] = rxdataF[a];
+    nr_symbol_fep_ul(fp, (c16_t *)ru->common.rxdata[a], rxdataF[a], symbol, slot, ru->N_TA_offset);
+    apply_nr_rotation_symbol_RX(fp, rxdataF[a], fp->symbol_rotation[link_type_ul], fp->N_RB_UL, slot, symbol);
+  }
+
+  int16_t w[16 * 2];
+  const int n_w = (catb_is_ref_symbol(symbol) || ru->ifdevice.xran_api.read_bfw == NULL)
+                      ? 0
+                      : ru->ifdevice.xran_api.read_bfw(slot, symbol, w, 16);
+
+  // Coverage census. A TB whose data symbols are only PARTLY combined mixes two different
+  // effective channels within one transport block, which kills it — same failure shape as the
+  // MU-IRC partial-coverage bug. Count it rather than discovering it as "throughput is low".
+  static long n_ref = 0, n_comb = 0, n_now = 0, n_log = 0;
+  if (catb_is_ref_symbol(symbol))
+    n_ref++;
+  else if (n_w > 0)
+    n_comb++;
+  else
+    n_now++;
+  if ((n_log++ % 20000) == 0)
+    LOG_A(PHY, "[CATB UL] ref=%ld combined=%ld no_weights=%ld (no_weights>0 => partial TBs)\n", n_ref, n_comb, n_now);
+
+  if (catb_is_ref_symbol(symbol)) {
+    // REFERENCE symbol: always per-antenna, so the DU can keep estimating H and computing W.
+    for (int a = 0; a < n_ant; a++)
+      ru->ifdevice.xran_api.write_pusch((uint32_t *)rxdataF[a], a, frame, slot, symbol);
+    return;
+  }
+  if (n_w <= 0) {
+    // DATA symbol with no weights yet. Do NOT fall back to per-antenna: the DU treats every data
+    // symbol as combined, so falling back makes the two sides disagree about the contents of the
+    // same symbol and every TB spanning them dies (measured: 30% fallback => 0 Mbps). Emit
+    // antenna 0 alone, which is exactly the degenerate weight the DU's own fallback assumes
+    // (unit on antenna 0, zero elsewhere). Consistent and decodable, just without array gain.
+    ru->ifdevice.xran_api.write_pusch((uint32_t *)rxdataF[0], 0, frame, slot, symbol);
+    return;
+  }
+
+  catb_combine_ul(ant_ptr, combined_buf, (n_w < n_ant) ? n_w : n_ant, fp->ofdm_symbol_size, w);
+  // ponytail: single layer. The DU only puts layer 0's weights on the wire today
+  // (oaioran.c catb_bfw_attach hardcodes layer 0), so there is no second weight vector to apply.
+  // Second layer = DU emits per-layer BFW on distinct eAxC, then write_pusch(.., 1, ..) here.
+  ru->ifdevice.xran_api.write_pusch((uint32_t *)combined_buf, 0, frame, slot, symbol);
 }

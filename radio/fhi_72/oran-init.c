@@ -34,6 +34,17 @@
 // Cat-B 3a.2: xran calls this when a C-plane section carrying beamforming weights arrives.
 // The weights themselves are deposited into the registered PRB map, so this only needs to
 // record that delivery happened — the apply path (3a.3) reads bf_weight.p_ext_section.
+// Cat-B 3a.2. Set from xran_fh_init->io_cfg.id in oai_oran_initialize(). BOTH nr-softmodem and
+// nr-oru run this file, so an env-only gate registers BFW *reception* on the O-DU too — the side
+// that SENDS weights. Only the O-RU receives them.
+static int g_catb_is_oru = 0;
+
+static int catb_bfw_rx_enabled(void)
+{
+  const char *e = getenv("OAI_CATB_BFW_RX");
+  return g_catb_is_oru && e && e[0] && e[0] != '0';
+}
+
 static void oai_xran_fh_rx_bfw_callback(void *tag, xran_status_t status)
 {
   (void)tag;
@@ -392,6 +403,41 @@ static void oran_allocate_buffers(void *handle,
                                size_of_prb_map,
                                &ulConf);
 
+  // Cat-B 3a.2: dedicated C-plane PRB maps for BFW reception. MUST NOT reuse srccp/dstcp — those
+  // belong to xran_5g_fronthault_config() and xran writes received weight sections into whatever
+  // is handed to xran_5g_bfw_config(). Allocated only when the feature is on, so the default path
+  // keeps its exact current memory footprint (Cat-A regression safety).
+  // ponytail: RX map seeded from ulConf because our BFW arrives on UL C-plane sections; the sample
+  // app seeds both from its DL map. If sections fail to match a prbMapElm, try dlConf here — the
+  // failure mode is dropped weights, not corruption.
+  const int catb_bfw_rx = catb_bfw_rx_enabled();
+  if (catb_bfw_rx) {
+    oran_allocate_cplane_buffers(pi->instanceHandle,
+                                 bl->bfwrxcp,
+                                 bl->bufs.bfw_rx_prbmap,
+                                 xran_max_antenna_nr,
+                                 xran_max_sections_per_slot,
+                               #if defined F_RELEASE
+                                 mtu,
+                                 fh_config,
+                               #endif
+                                 size_of_prb_map,
+                                 &ulConf);
+    oran_allocate_cplane_buffers(pi->instanceHandle,
+                                 bl->bfwtxcp,
+                                 bl->bufs.bfw_tx_prbmap,
+                                 xran_max_antenna_nr,
+                                 xran_max_sections_per_slot,
+                               #if defined F_RELEASE
+                                 mtu,
+                                 fh_config,
+                               #endif
+                                 size_of_prb_map,
+                                 &dlConf);
+    printf("[CATB] BFW C-plane PRB maps allocated (dedicated, not aliased to srccp/dstcp)\n");
+    fflush(stdout);
+  }
+
   // PRACH
   const uint32_t prachBufSize = PRACH_PLAYBACK_BUFFER_BYTES;
   oran_allocate_uplane_buffers(pi->instanceHandle, bl->prachdst, bl->bufs.prach, xran_max_antenna_nr, prachBufSize);
@@ -413,6 +459,8 @@ static void oran_allocate_buffers(void *handle,
   struct xran_buffer_list *dstcp[XRAN_MAX_ANTENNA_NR][XRAN_N_FE_BUF_LEN];
   struct xran_buffer_list *prach[XRAN_MAX_ANTENNA_NR][XRAN_N_FE_BUF_LEN];
   struct xran_buffer_list *prachdecomp[XRAN_MAX_ANTENNA_NR][XRAN_N_FE_BUF_LEN];
+  struct xran_buffer_list *bfwrxcp[XRAN_MAX_ANTENNA_NR][XRAN_N_FE_BUF_LEN];
+  struct xran_buffer_list *bfwtxcp[XRAN_MAX_ANTENNA_NR][XRAN_N_FE_BUF_LEN];
   for (uint32_t a = 0; a < XRAN_MAX_ANTENNA_NR; ++a) {
     for (uint32_t j = 0; j < XRAN_N_FE_BUF_LEN; ++j) {
       src[a][j] = &bl->src[a][j];
@@ -421,6 +469,8 @@ static void oran_allocate_buffers(void *handle,
       dstcp[a][j] = &bl->dstcp[a][j];
       prach[a][j] = &bl->prachdst[a][j];
       prachdecomp[a][j] = &bl->prachdstdecomp[a][j];
+      bfwrxcp[a][j] = &bl->bfwrxcp[a][j];
+      bfwtxcp[a][j] = &bl->bfwtxcp[a][j];
     }
   }
 
@@ -431,13 +481,17 @@ static void oran_allocate_buffers(void *handle,
   // xran where to put it. Declared in xran_fh_o_ru.h:94; working reference is the sample app
   // (app_io_fh_xran.c:994). After registration the weights land in
   // prbMapElm->bf_weight.p_ext_section, so the RU reads its own PRB map — no packet parsing.
-  // Same buffer arrays as the fronthaul config above: RX C-plane is dstcp, TX C-plane srccp.
-  {
-    const char *e = getenv("OAI_CATB_BFW_RX");
-    if (e && e[0] && e[0] != '0') {
-      int32_t rc = xran_5g_bfw_config(pi->instanceHandle, dstcp, srccp, oai_xran_fh_rx_bfw_callback, &portInstances->pusch_tag);
-      printf("[CATB] xran_5g_bfw_config -> %d (BFW reception %s)\n", rc, rc == 0 ? "REGISTERED" : "FAILED");
-    }
+  // Dedicated maps + own tag, mirroring the sample app. An earlier version passed dstcp/srccp,
+  // which xran also uses for the U-plane fronthaul config -> received sections overwrote the live
+  // PRB map and every attach failed (0/2) while this call still returned 0: it validates only the
+  // handle and device context, so rc==0 is NOT evidence the buffers were right.
+  if (catb_bfw_rx) {
+    int32_t rc = xran_5g_bfw_config(pi->instanceHandle, bfwrxcp, bfwtxcp, oai_xran_fh_rx_bfw_callback, &portInstances->bfw_tag);
+    printf("[CATB] xran_5g_bfw_config -> %d (BFW reception %s)\n", rc, rc == 0 ? "REGISTERED" : "FAILED");
+    // fflush REQUIRED: stdout is block-buffered to the harness log and the RU is always SIGKILLed
+    // at cleanup, which discards the buffer. Without this the RU's registration line can never
+    // appear no matter what the code did — a false negative that already cost two runs.
+    fflush(stdout);
   }
 }
 
@@ -469,6 +523,7 @@ int *oai_oran_initialize(struct xran_fh_init *xran_fh_init, struct xran_fh_confi
   }
 
   bool is_du = xran_fh_init->io_cfg.id == 0;
+  g_catb_is_oru = !is_du; // Cat-B 3a.2: only the O-RU receives BFW (io_cfg.id: 0 = O-DU, 1 = O-RU)
   /** process all the O-RU|O-DU for use case */
   for (int32_t o_xu_id = 0; o_xu_id < xran_fh_init->xran_ports; o_xu_id++) {
     print_fh_config(&xran_fh_config[o_xu_id]);
@@ -484,6 +539,7 @@ int *oai_oran_initialize(struct xran_fh_init *xran_fh_init, struct xran_fh_confi
     struct xran_cb_tag tag = {.cellId = sector, .oXuId = o_xu_id};
     pi->prach_tag = tag;
     pi->pusch_tag = tag;
+    pi->bfw_tag = tag;
 #if defined F_RELEASE
     oran_allocate_buffers(gxran_handle, o_xu_id, 1, pi, xran_fh_init->mtu, &xran_fh_config[o_xu_id]);
 #endif

@@ -288,6 +288,42 @@ typedef struct {
 
 static oran_pusch_cplane_config_t pusch_config[MAX_NUM_ANTENNAS][20][14];
 
+// ---- Cat-B 3a.3: received UL beamforming weights -----------------------------------------
+// Filled from the ext-1 riding on the UL C-plane section (see the parser below). Wideband for
+// 3a: ONE weight vector across antennas per (slot, symbol), which is all the DU sends
+// (oaioran.c catb_bfw_attach uses the mid-band PRB, layer 0). Indexed [slot][symbol]; the DU
+// attaches the SAME vector to every eAxC's section, so the last writer wins and that is correct.
+#define CATB_MAX_BFW_ANT 16
+typedef struct {
+  int16_t w[CATB_MAX_BFW_ANT * 2]; // interleaved I,Q per antenna, Q15
+  int n_ant;
+  int valid;
+  uint64_t seq; // bumped on every update; lets the consumer spot staleness
+} catb_bfw_set_t;
+
+static catb_bfw_set_t catb_bfw[20][14];
+// Most recent set seen on ANY (slot,symbol). Only ~25% of UL sections carry an ext-1, so a
+// strict per-(slot,symbol) lookup missed ~98% of data symbols: the RU then fell back to
+// per-antenna while the DU was already treating every data symbol as combined, and the two
+// sides disagreed about the contents of the same symbol. Weights are wideband and slowly
+// varying (the DU publishes one vector per slot), so the latest set is the right fallback.
+static catb_bfw_set_t catb_bfw_latest;
+
+// Read-only accessor for nr-oru.c. Returns antenna count, or 0 if no weights have EVER arrived.
+int catb_bfw_get(int slot, int symbol, int16_t *out, int max_ant)
+{
+  const catb_bfw_set_t *s = NULL;
+  if (slot >= 0 && slot < 20 && symbol >= 0 && symbol < 14 && catb_bfw[slot][symbol].valid)
+    s = &catb_bfw[slot][symbol];
+  else if (catb_bfw_latest.valid)
+    s = &catb_bfw_latest;
+  if (s == NULL || s->n_ant == 0)
+    return 0;
+  const int n = (s->n_ant < max_ant) ? s->n_ant : max_ant;
+  memcpy(out, s->w, (size_t)n * 2 * sizeof(int16_t));
+  return n;
+}
+
 #define ORU_PRACH_CPLANE_DEBUG 1
 #define PRACH_FRAME_ID_MOD 256
 #define PRACH_SLOTS_PER_FRAME 20
@@ -898,6 +934,65 @@ int32_t process_ru_cplane(struct rte_mbuf *pkt, void *handle, uint16_t port_id, 
       if (numPrbc == 0) {
         const struct xran_fh_config *cp_fh_cfg = get_xran_fh_config(0);
         numPrbc = cp_fh_cfg->nULRBs - startPrbc;
+      }
+      // ---- Cat-B 3a.3 PROBE (OAI_CATB_BFW_RX=1): are the DU's beamforming weights actually here?
+      // This RU parses C-plane itself and returns MBUF_FREE — it never reads xran's
+      // sFHCpRxPrbMapBbuIoBufCtrl deposit, so `prbMapElm->bf_weight.p_ext_section` (the path
+      // 3a.2 registered) is NOT how weights reach this RU. They arrive as an ext-1 appended to
+      // the section we just parsed, flagged by `ef`. Read them here, where the packet already is.
+      {
+        static int probe = -1;
+        if (probe < 0) {
+          const char *e = getenv("OAI_CATB_BFW_RX");
+          probe = (e && e[0] && e[0] != '0') ? 1 : 0;
+        }
+        if (probe) {
+          static long n_sec = 0, n_ef = 0;
+          n_sec++;
+          if (section->hdr.u.s1.ef) {
+            n_ef++;
+            // ext-1 follows the section1 body. Do NOT rte_pktmbuf_adj here: the U-plane path
+            // below still needs the mbuf intact, and this probe must stay read-only.
+            const struct xran_cp_radioapp_section_ext1 *ext =
+                (const struct xran_cp_radioapp_section_ext1 *)((const uint8_t *)section
+                                                               + sizeof(struct xran_cp_radioapp_section1));
+            // Decode the weight vector. Layout after the 4-byte ext-1 header (extType/ef, extLen,
+            // bfwCompHdr) is (bfwI,bfwQ)+ as int16 big-endian, nAntElmTRx pairs. compMeth 0 =
+            // uncompressed, iqWidth 0 = 16 bit -> 4 B/antenna, so n_ant = (extLen*4 - 4) / 4.
+            if (ext->extType == 1 && ext->bfwCompMeth == 0 && ext->bfwIqWidth == 0) {
+              const int n_ant = ((int)ext->extLen * 4 - 4) / 4;
+              if (n_ant > 0 && n_ant <= CATB_MAX_BFW_ANT) {
+                const uint8_t *p = (const uint8_t *)ext + 4;
+                // Store for EVERY symbol this section covers, exactly as pusch_config does below.
+                // Keying only start_symbol would leave the other data symbols weightless and they
+                // would silently fall through to per-antenna — the partial-coverage failure mode.
+                for (int sy = start_symbol; sy < start_symbol + num_symbols && sy < 14; sy++) {
+                  catb_bfw_set_t *dst = &catb_bfw[slot][sy];
+                  for (int a = 0; a < n_ant; a++) {
+                    dst->w[2 * a]     = (int16_t)((p[4 * a] << 8) | p[4 * a + 1]);
+                    dst->w[2 * a + 1] = (int16_t)((p[4 * a + 2] << 8) | p[4 * a + 3]);
+                  }
+                  dst->n_ant = n_ant;
+                  dst->valid = 1;
+                  dst->seq++;
+                  catb_bfw_latest = *dst;
+                }
+              }
+            }
+            if ((n_ef % 2000) == 1) {
+              const catb_bfw_set_t *s = &catb_bfw[slot][start_symbol];
+              LOG_A(HW,
+                    "[CATB BFW RX] sections=%ld with_ef=%ld | extType=%u extLen=%u compMeth=%u iqWidth=%u"
+                    " | aarx=%d slot=%d sym=%u prb=%d+%d | n_ant=%d seq=%lu w[0..3]=(%d,%d)(%d,%d)\n",
+                    n_sec, n_ef, ext->extType, ext->extLen, ext->bfwCompMeth, ext->bfwIqWidth,
+                    aarx, slot, start_symbol, startPrbc, numPrbc,
+                    s->n_ant, (unsigned long)s->seq,
+                    s->w[0], s->w[1], s->w[2], s->w[3]);
+            }
+          } else if ((n_sec % 20000) == 1) {
+            LOG_A(HW, "[CATB BFW RX] sections=%ld with_ef=%ld (no extension on this section)\n", n_sec, n_ef);
+          }
+        }
       }
       for (int symbol = start_symbol; symbol < start_symbol + num_symbols && symbol < 14; symbol++) {
         pusch_config[aarx][slot][symbol].section_id = section_id;

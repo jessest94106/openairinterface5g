@@ -700,6 +700,13 @@ struct openair0_device {
      * \param symbol
      */
     void (*write_pusch)(uint32_t *prachF, int aarx, int frame, int slot, int symbol);
+
+    /*!
+     * \brief Cat-B 3a.3: read UL beamforming weights received on the C-plane for this
+     * slot/symbol. Returns the number of antennas whose weights were copied, 0 if none.
+     * NULL when the fronthaul device does not implement Cat-B.
+     */
+    int (*read_bfw)(int slot, int symbol, int16_t *out, int max_ant);
   } xran_api;
 };
 

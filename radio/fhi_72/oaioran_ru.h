@@ -34,5 +34,7 @@ void init_oru_packet_processor(void* handle, int callbacks_per_slot);
 int xran_oru_tx_read_slot(uint32_t **txdataF, int nb_tx, int *frame, int *slot, int *symbol, int *num_symbols, struct timespec *ts);
 void xran_oru_send_prach(uint32_t *prachF, int aarx, int frame, int slot, int symbol);
 void xran_oru_send_pusch(uint32_t *puschF, int aarx, int frame, int slot, int symbol);
+// Cat-B 3a.3: received UL beamforming weights for (slot,symbol). Returns antenna count, 0 if none.
+int catb_bfw_get(int slot, int symbol, int16_t *out, int max_ant);
 
 #endif
