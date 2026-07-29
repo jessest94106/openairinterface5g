@@ -29,6 +29,19 @@
 
 #include "oran-config.h"
 #include "oran-init.h"
+#include "xran_fh_o_ru.h"
+
+// Cat-B 3a.2: xran calls this when a C-plane section carrying beamforming weights arrives.
+// The weights themselves are deposited into the registered PRB map, so this only needs to
+// record that delivery happened — the apply path (3a.3) reads bf_weight.p_ext_section.
+static void oai_xran_fh_rx_bfw_callback(void *tag, xran_status_t status)
+{
+  (void)tag;
+  static long n = 0;
+  if ((n++ % 2000) == 0)
+    printf("[CATB] BFW rx callback #%ld status %d\n", n, status);
+}
+
 #include "oaioran.h"
 
 #include "common/utils/assertions.h"
@@ -413,6 +426,19 @@ static void oran_allocate_buffers(void *handle,
 
   xran_5g_fronthault_config(pi->instanceHandle, src, srccp, dst, dstcp, oai_xran_fh_rx_callback, &portInstances->pusch_tag);
   xran_5g_prach_req(pi->instanceHandle, prach, prachdecomp, oai_xran_fh_rx_prach_callback, &portInstances->prach_tag);
+  // Cat-B 3a.2 (OAI_CATB_BFW_RX=1): register where xran should deposit RECEIVED C-plane
+  // beamforming weights. OAI never called this, which is why the RU had no BFW — nothing told
+  // xran where to put it. Declared in xran_fh_o_ru.h:94; working reference is the sample app
+  // (app_io_fh_xran.c:994). After registration the weights land in
+  // prbMapElm->bf_weight.p_ext_section, so the RU reads its own PRB map — no packet parsing.
+  // Same buffer arrays as the fronthaul config above: RX C-plane is dstcp, TX C-plane srccp.
+  {
+    const char *e = getenv("OAI_CATB_BFW_RX");
+    if (e && e[0] && e[0] != '0') {
+      int32_t rc = xran_5g_bfw_config(pi->instanceHandle, dstcp, srccp, oai_xran_fh_rx_bfw_callback, &portInstances->pusch_tag);
+      printf("[CATB] xran_5g_bfw_config -> %d (BFW reception %s)\n", rc, rc == 0 ? "REGISTERED" : "FAILED");
+    }
+  }
 }
 
 int *oai_oran_initialize(struct xran_fh_init *xran_fh_init, struct xran_fh_config *xran_fh_config)
