@@ -1239,10 +1239,24 @@ static void catb_combine_ul(c16_t *const *rxdataF_ant, c16_t *out, int n_ant, in
     for (int a = 0; a < n_ant; a++) {
       const int32_t xr = rxdataF_ant[a][re].r, xi = rxdataF_ant[a][re].i;
       const int32_t wr = w[2 * a], wi = w[2 * a + 1];
-      // conjugate weight: MRC/MMSE combining is w^H x
-      acc_r += (xr * wr + xi * wi) >> 15;
-      acc_i += (xi * wr - xr * wi) >> 15;
+      // NO SECOND CONJUGATE (§25). catb_publish_weights emits W = G^-1 H^H, so
+      // w[l][a] = sum_i invG[l][i]*conj(h_i[a]) — the conjugate is ALREADY in w. Applying
+      // x*conj(w) conjugated a second time: sum_a x_a conj(w_a) = sum_a (h_a s) h_a = s*sum h_a^2,
+      // where the phases ADD instead of cancelling. Correct is sum_a w_a x_a = s*sum |h_a|^2.
+      // MEASURED: coherence |vec_sum|/sum|term| = 0.197-0.354, mean 0.25 = 1/sqrt(16), the exact
+      // random-walk signature. Frequency selectivity was excluded first (DS 0.1us and 0.005us both
+      // give ratio 0.21), so this is the whole of the loss.
+      // ACCUMULATE FULL PRECISION, SHIFT ONCE (§24). The >>15 was INSIDE this loop, so each of the
+      // 16 antenna terms was truncated to an integer before summing — and here the operands are
+      // small: |x| ~ 18/RE against |w_a| ~ 2048 gives 18*2048 >> 15 = 1.125 -> 1, i.e. every term
+      // collapsed to a single LSB and weaker antennas to ZERO. The combined stream then carried
+      // ~4 bits and the DU decoded it as noise (pwr == npwr, llr 0). No overflow: w is
+      // L1-normalised (sum_a |w_a| <= 32768), bounding the sum at 32767*32768 = 1.07e9 < INT32_MAX.
+      acc_r += xr * wr - xi * wi;
+      acc_i += xr * wi + xi * wr;
     }
+    acc_r >>= 15;
+    acc_i >>= 15;
     out[re].r = (int16_t)(acc_r > 32767 ? 32767 : (acc_r < -32768 ? -32768 : acc_r));
     out[re].i = (int16_t)(acc_i > 32767 ? 32767 : (acc_i < -32768 ? -32768 : acc_i));
   }
@@ -1311,10 +1325,24 @@ static void receive_pusch_catb(void *args)
     apply_nr_rotation_symbol_RX(fp, rxdataF[a], fp->symbol_rotation[link_type_ul], fp->N_RB_UL, slot, symbol);
   }
 
+  // The DU attaches BFW to DATA symbols only, so "weights present" == "the DU wants this symbol
+  // combined". That makes the framing decision come off the wire (O-RAN's ef bit) instead of both
+  // sides independently guessing a symbol list — which is what previously let them disagree.
   int16_t w[16 * 2];
-  const int n_w = (catb_is_ref_symbol(symbol) || ru->ifdevice.xran_api.read_bfw == NULL)
+  const int n_w = (ru->ifdevice.xran_api.read_bfw == NULL)
                       ? 0
                       : ru->ifdevice.xran_api.read_bfw(slot, symbol, w, 16);
+  // SLOT-KEY CENSUS (lookup side). Compare with [CATB KEY store]: if the two histograms occupy
+  // different slots, the store and lookup keys have drifted and that is the coverage bug.
+  {
+    static long lk[20] = {0}, hit[20] = {0}, nlk = 0;
+    if (slot >= 0 && slot < 20) { lk[slot]++; if (n_w > 0) hit[slot]++; }
+    if ((nlk++ % 20000) == 0) {
+      char b[256]; int o = 0;
+      for (int i = 0; i < 20; i++) o += snprintf(b + o, sizeof(b) - o, "%ld/%ld,", hit[i], lk[i]);
+      LOG_A(PHY, "[CATB KEY lookup] per-slot hit/ask: %s\n", b);
+    }
+  }
 
   // Coverage census. A TB whose data symbols are only PARTLY combined mixes two different
   // effective channels within one transport block, which kills it — same failure shape as the
@@ -1329,13 +1357,14 @@ static void receive_pusch_catb(void *args)
   if ((n_log++ % 20000) == 0)
     LOG_A(PHY, "[CATB UL] ref=%ld combined=%ld no_weights=%ld (no_weights>0 => partial TBs)\n", n_ref, n_comb, n_now);
 
-  if (catb_is_ref_symbol(symbol)) {
-    // REFERENCE symbol: always per-antenna, so the DU can keep estimating H and computing W.
+  if (n_w <= 0) {
+    // No weights for this symbol => the DU marked it a REFERENCE symbol. Forward every antenna so
+    // the DU can keep estimating H and computing W.
     for (int a = 0; a < n_ant; a++)
       ru->ifdevice.xran_api.write_pusch((uint32_t *)rxdataF[a], a, frame, slot, symbol);
     return;
   }
-  if (n_w <= 0) {
+  if (0) {
     // DATA symbol with no weights yet. Do NOT fall back to per-antenna: the DU treats every data
     // symbol as combined, so falling back makes the two sides disagree about the contents of the
     // same symbol and every TB spanning them dies (measured: 30% fallback => 0 Mbps). Emit
@@ -1346,6 +1375,63 @@ static void receive_pusch_catb(void *args)
   }
 
   catb_combine_ul(ant_ptr, combined_buf, (n_w < n_ant) ? n_w : n_ant, fp->ofdm_symbol_size, w);
+  // PROBE A (§21). The DU decodes the combined stream as pure noise (pwr == npwr, llr 0) even with
+  // one UE, valid weights and 100% coverage. Measure whether the signal is already gone HERE,
+  // before the wire. Ratio, not absolute: |combined| against |antenna 0| over the same REs, since
+  // antenna 0 is what the DU falls back to and is known to decode. Combining 16 antennas with an
+  // L1-normalised w should land within a small factor of a single antenna — a ratio near 0 means
+  // the combiner or its >>15 scaling is destroying the signal.
+  {
+    // Sample only symbols that actually carry signal. Blind sampling mostly hit IDLE UL slots
+    // (|ant0|=0), which look like failures but are just nothing transmitted.
+    long mc = 0, m0 = 0;
+    for (int k = 0; k < fp->ofdm_symbol_size; k++) {
+      mc += abs(combined_buf[k].r) + abs(combined_buf[k].i);
+      m0 += abs(ant_ptr[0][k].r) + abs(ant_ptr[0][k].i);
+    }
+    // COHERENCE FACTOR. ratio = |combined|/|ant0| conflates "wrong weights" with "right weights,
+    // small signal". This separates them: compare the VECTOR sum |sum_a x_a conj(w_a)| against the
+    // SCALAR sum sum_a |x_a conj(w_a)| at one RE. Coherent => ~1.0. Random pairing of w_a to x_a
+    // => ~1/sqrt(16) = 0.25, which is what ratio 0.21 smells like. Frequency selectivity is
+    // already EXCLUDED: DS 0.1us and 0.005us (20x flatter) both give 0.21.
+    {
+      // SAMPLE REAL DATA SUBCARRIERS, AVERAGED. The first version sampled ONE RE at
+      // ofdm_symbol_size/2 — in OAI's rxdataF, DC is index 0 and the spectrum wraps, so the middle
+      // index is the GUARD BAND. It was measuring noise against weights, which is ~1/sqrt(16)=0.25
+      // BY CONSTRUCTION, which is why the figure sat at 0.25 regardless of the conjugation change.
+      // Use the low positive-frequency bins (1..nre_half), which carry the allocation, and average
+      // the ratio over many REs so one bad RE cannot set the answer.
+      const int nre_half = (fp->N_RB_UL * 12) / 2;
+      double coh_sum = 0.0;
+      int coh_n = 0;
+      for (int re = 1; re < nre_half && re < fp->ofdm_symbol_size; re += 37) {
+        long long sr = 0, si = 0, scal = 0;
+        for (int a = 0; a < ((n_w < n_ant) ? n_w : n_ant); a++) {
+          const long long xr = ant_ptr[a][re].r, xi = ant_ptr[a][re].i;
+          const long long wr = w[2 * a], wi = w[2 * a + 1];
+          const long long tr = xr * wr - xi * wi, ti = xr * wi + xi * wr; // must match the combine
+          sr += tr;
+          si += ti;
+          scal += llabs(tr) + llabs(ti);
+        }
+        if (scal > 0) {
+          coh_sum += (double)(llabs(sr) + llabs(si)) / (double)scal;
+          coh_n++;
+        }
+      }
+      LOG_A(PHY, "[CATB COH] slot=%d sym=%d nre=%d coherence=%.3f (1.0=coherent, 0.25=random)\n",
+            slot, symbol, coh_n, coh_n ? coh_sum / coh_n : -1.0);
+    }
+    static long nprobe = 0;
+    // w[0..3] so the APPLIED vector can be diffed element-wise against the DU's ASSUMED vector
+    // ([CATB MAG-B]) at a matched (slot, symbol). Magnitudes alone cannot separate "wrong vector"
+    // from "right vector, bad scaling" — the ratios disagreed 7x and that was as far as they went.
+    if (m0 > 0 && (nprobe++ % 500) == 0)
+      LOG_A(PHY, "[CATB MAG-A] slot=%d sym=%d n_w=%d |combined|=%ld |ant0|=%ld ratio=%.3f "
+                 "w[0..3]=(%d,%d)(%d,%d)(%d,%d)(%d,%d)\n",
+            slot, symbol, n_w, mc, m0, (double)mc / (double)m0,
+            w[0], w[1], w[2], w[3], w[4], w[5], w[6], w[7]);
+  }
   // ponytail: single layer. The DU only puts layer 0's weights on the wire today
   // (oaioran.c catb_bfw_attach hardcodes layer 0), so there is no second weight vector to apply.
   // Second layer = DU emits per-layer BFW on distinct eAxC, then write_pusch(.., 1, ..) here.

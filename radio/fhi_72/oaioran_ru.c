@@ -302,22 +302,88 @@ typedef struct {
 } catb_bfw_set_t;
 
 static catb_bfw_set_t catb_bfw[20][14];
-// Most recent set seen on ANY (slot,symbol). Only ~25% of UL sections carry an ext-1, so a
-// strict per-(slot,symbol) lookup missed ~98% of data symbols: the RU then fell back to
-// per-antenna while the DU was already treating every data symbol as combined, and the two
-// sides disagreed about the contents of the same symbol. Weights are wideband and slowly
-// varying (the DU publishes one vector per slot), so the latest set is the right fallback.
-static catb_bfw_set_t catb_bfw_latest;
+// Lookups are scoped to the C-plane SECTION that carried the ext-1, never widened past it. An
+// earlier version fell back to "the most recent set seen on any slot": the RU then combined slot N
+// with slot N-k's weights while the DU un-combined with its own newest set — a residual phase
+// rotation, and nothing decoded. Vintage is the variable this whole project measures, so it must
+// not be approximated away.
+//
+// SAME-SLOT lookup. The DU's PRB map is per (antenna, SLOT), not per symbol: catb_bfw_attach
+// runs inside a symbol loop but every call lands on the same prbMap element and overwrites the
+// previous bf_weight, so only ONE ext-1 per element reaches the wire per slot (measured: DU
+// attached 75% of sections, RU saw ef on 15.5%, combined 5%).
+// Using another symbol of the SAME slot is exact, not an approximation: 3a publishes one wideband
+// vector per slot, so every symbol in slot N shares one vintage. This is NOT the old "most recent
+// across any slot" hack — that crossed slots and destroyed the vintage.
+static const catb_bfw_set_t *catb_bfw_find(int slot, int symbol)
+{
+  if (slot < 0 || slot >= 20)
+    return NULL;
+  if (catb_bfw[slot][symbol].valid && catb_bfw[slot][symbol].n_ant > 0)
+    return &catb_bfw[slot][symbol];
+  for (int sy = 0; sy < 14; sy++)
+    if (catb_bfw[slot][sy].valid && catb_bfw[slot][sy].n_ant > 0)
+      return &catb_bfw[slot][sy];
+  return NULL;
+}
 
-// Read-only accessor for nr-oru.c. Returns antenna count, or 0 if no weights have EVER arrived.
+// The UL C-plane is emitted ONE SECTION PER TDD PERIOD, and that section's header carries the
+// period's FIRST UL slot while covering the whole period's UL allocation. Measured with
+// nTddPeriod=5: weights were stored only at slots 1,6,11,16 while 2,3,4 / 7,8,9 / ... were asked
+// 9128x each and hit 0 — exactly the 5% coverage observed. Redirecting those asks to the period's
+// first UL slot is EXACT, not an approximation: it is the same section, so the same weight vector
+// and the same vintage. Derived from the TDD pattern xran already parsed, never hardcoded.
+static int catb_period = -1; // -1 = not yet resolved, 0 = no period scoping (FDD / no UL slot)
+static int catb_first_ul = 0;
+
+static void catb_period_resolve(void)
+{
+  if (catb_period >= 0)
+    return;
+  catb_period = 0;
+  const struct xran_fh_config *cfg = get_xran_fh_config(0);
+  const struct xran_frame_config *fc = cfg ? &cfg->frame_conf : NULL;
+  if (fc && fc->nFrameDuplexType == 1 && fc->nTddPeriod > 0 && fc->nTddPeriod <= 20) {
+    for (int i = 0; i < fc->nTddPeriod && catb_period == 0; i++)
+      for (int sy = 0; sy < 14; sy++)
+        if (fc->sSlotConfig[i].nSymbolType[sy] == XRAN_SYMBOL_TYPE_UL) {
+          catb_period = fc->nTddPeriod;
+          catb_first_ul = i;
+          break;
+        }
+  }
+  LOG_A(HW, "[CATB BFW] period scoping: nTddPeriod=%d first_ul_slot_in_pattern=%d\n", catb_period, catb_first_ul);
+}
+
+int catb_tdd_period(void)
+{
+  catb_period_resolve();
+  return catb_period;
+}
+
+int catb_period_first_ul_slot(int slot)
+{
+  catb_period_resolve();
+  if (catb_period == 0)
+    return slot;
+  const int resolved = slot - (slot % catb_period) + catb_first_ul;
+  // nTddPeriod need not divide 20; a period straddling the frame edge would resolve out of range.
+  return (resolved < 20) ? resolved : slot;
+}
+
+// Read-only accessor for nr-oru.c. Returns 0 if no weights apply, and the caller then sends
+// antenna 0 alone — which is exactly what the DU assumes for a slot with no applied record.
 int catb_bfw_get(int slot, int symbol, int16_t *out, int max_ant)
 {
-  const catb_bfw_set_t *s = NULL;
-  if (slot >= 0 && slot < 20 && symbol >= 0 && symbol < 14 && catb_bfw[slot][symbol].valid)
-    s = &catb_bfw[slot][symbol];
-  else if (catb_bfw_latest.valid)
-    s = &catb_bfw_latest;
-  if (s == NULL || s->n_ant == 0)
+  if (slot < 0 || slot >= 20 || symbol < 0 || symbol >= 14)
+    return 0;
+  const catb_bfw_set_t *s = catb_bfw_find(slot, symbol);
+  if (s == NULL) {
+    const int ps = catb_period_first_ul_slot(slot);
+    if (ps != slot)
+      s = catb_bfw_find(ps, symbol);
+  }
+  if (s == NULL)
     return 0;
   const int n = (s->n_ant < max_ant) ? s->n_ant : max_ant;
   memcpy(out, s->w, (size_t)n * 2 * sizeof(int16_t));
@@ -975,7 +1041,20 @@ int32_t process_ru_cplane(struct rte_mbuf *pkt, void *handle, uint16_t port_id, 
                   dst->n_ant = n_ant;
                   dst->valid = 1;
                   dst->seq++;
-                  catb_bfw_latest = *dst;
+                }
+                // SLOT-KEY CENSUS (store side). oaioran_ru.c already documents that under
+                // XRAN_TIMESCALE dilation the DU's xran SFN is GPS-anchored while the RU's
+                // vrtsim air frame free-runs, so C-plane-derived slot keys drift from the RU's
+                // own slot counter (PRACH carries prach_config_latest_by_slot for exactly this).
+                // Print WHERE weights are stored so it can be compared with where they are read.
+                {
+                  static long st[20] = {0}, nst = 0;
+                  if (slot >= 0 && slot < 20) st[slot]++;
+                  if ((nst++ % 20000) == 0) {
+                    char b[256]; int o = 0;
+                    for (int i = 0; i < 20; i++) o += snprintf(b + o, sizeof(b) - o, "%ld,", st[i]);
+                    LOG_A(HW, "[CATB KEY store] per-slot: %s\n", b);
+                  }
                 }
               }
             }

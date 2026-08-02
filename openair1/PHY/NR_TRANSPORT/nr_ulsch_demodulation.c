@@ -707,7 +707,9 @@ static void nr_ulsch_construct_HhH_elements(c16_t *conjch00_ch00,
 // ponytail: double precision, normalised per PRB — magnitude is arbitrary for a combiner,
 // only the relative pattern across antennas carries information, and the STEP 2 acceptance
 // check is that the per-antenna PHASE matches the configured CDL arrival angles.
-static void catb_publish_weights(catb_weight_ring_t *ring,
+// Returns the number of PRBs left ZEROED because G was singular. A publish that zeroed every PRB
+// still "succeeds" — presence flags have lied here before (§17 bug 4), so the caller logs this.
+static int catb_publish_weights(catb_weight_ring_t *ring,
                                  int frame,
                                  int slot,
                                  uint16_t rnti,
@@ -716,10 +718,15 @@ static void catb_publish_weights(catb_weight_ring_t *ring,
                                  int nb_rx_ant,
                                  uint32_t buffer_length,
                                  const c16_t ch[][nb_rx_ant][buffer_length],
-                                 uint32_t nvar)
+                                 uint32_t nvar,
+                                 int re_per_prb,
+                                 int src)
 {
   if (ring == NULL || nb_rx_ant > CATB_MAX_ANT || nb_rb > CATB_MAX_PRB || nb_rb <= 0)
-    return;
+    return -1;
+  int n_sing = 0;
+  double dbg_l1 = 0.0, dbg_scale = 0.0, dbg_wr = 0.0, dbg_wi = 0.0;
+  int dbg_q_r = 0, dbg_q_i = 0, dbg_break_prb = -1, dbg_written = 0;
   const int L = CATB_MAX_LAYERS;
   catb_weight_rec_t *rec = catb_ring_begin(ring);
   rec->frame = (uint16_t)frame;
@@ -731,9 +738,16 @@ static void catb_publish_weights(catb_weight_ring_t *ring,
   rec->n_layers = (uint8_t)L;
 
   for (int prb = 0; prb < nb_rb; prb++) {
-    const uint32_t re = (uint32_t)prb * 12u + 6u; // PRB centre
-    if (re >= buffer_length)
+    // PRB centre. re_per_prb is 12 on a DATA symbol but only 6 on a DMRS symbol, because
+    // nr_ulsch_extract_rbs() packs just the DMRS-carrying REs there. Hardcoding 12 while
+    // publishing from a reference symbol read PAST the filled region for mid/high PRBs and
+    // produced an ALL-ZERO weight vector on the wire (observed: w[0..3]=(0,0)(0,0)).
+    const uint32_t re = (uint32_t)prb * (uint32_t)re_per_prb + (uint32_t)(re_per_prb / 2);
+    if (re >= buffer_length) {
+      dbg_break_prb = prb; // which PRB the loop stopped at — measured last_nz says 53 of 106
       break;
+    }
+    dbg_written = prb + 1;
     double hr[CATB_MAX_LAYERS][CATB_MAX_ANT], hi[CATB_MAX_LAYERS][CATB_MAX_ANT];
     for (int l = 0; l < L; l++)
       for (int a = 0; a < nb_rx_ant; a++) {
@@ -749,19 +763,30 @@ static void catb_publish_weights(catb_weight_ring_t *ring,
           sr += hr[i][a] * hr[j][a] + hi[i][a] * hi[j][a];   // conj(h_i)·h_j
           si += hr[i][a] * hi[j][a] - hi[i][a] * hr[j][a];
         }
-        gr[i][j] = sr + (i == j ? (double)nvar : 0.0);
+        // REGULARISER MUST BE NON-ZERO. In the SU case (§20) the partner channel is zeroed, so G
+        // is Hermitian-diagonal and det collapses to exactly (|h0|^2 + nvar) * nvar — PROPORTIONAL
+        // to nvar. With nvar == 0 (it is a uint32_t, so exactly 0 is reachable) the dd < 1e-9 guard
+        // below fires on every PRB and an ALL-ZERO vector goes on the wire: measured
+        // w[0..3]=(0,0)(0,0), which the RU then combines with, producing "MSG3 ULSCH with no
+        // signal" and blocking every subsequent attach. The nvar cancels analytically in
+        // w[0] = conj(h0)/(|h0|^2 + nvar), so flooring it at 1 changes the answer by ~1e-5 while
+        // keeping G invertible. The MU path is unaffected (its det does not vanish with nvar).
+        const double reg = (nvar > 0) ? (double)nvar : 1.0;
+        gr[i][j] = sr + (i == j ? reg : 0.0);
         gi[i][j] = si;
       }
     // inv(G) for 2x2: [[g11,-g01],[-g10,g00]] / det
     const double dr = gr[0][0] * gr[1][1] - gi[0][0] * gi[1][1] - (gr[0][1] * gr[1][0] - gi[0][1] * gi[1][0]);
     const double di = gr[0][0] * gi[1][1] + gi[0][0] * gr[1][1] - (gr[0][1] * gi[1][0] + gi[0][1] * gr[1][0]);
     const double dd = dr * dr + di * di;
-    if (dd < 1e-9)
+    if (dd < 1e-9) {
+      n_sing++;
       continue; // singular (collinear UEs) — leave this PRB zeroed rather than emit garbage
+    }
     const double invr[2][2] = {{gr[1][1], -gr[0][1]}, {-gr[1][0], gr[0][0]}};
     const double invi[2][2] = {{gi[1][1], -gi[0][1]}, {-gi[1][0], gi[0][0]}};
     // W = G^-1 H^H  ->  w[l][a] = sum_i invG[l][i] * conj(h_i[a])
-    double wr[CATB_MAX_LAYERS][CATB_MAX_ANT], wi[CATB_MAX_LAYERS][CATB_MAX_ANT], wmax = 0.0;
+    double wr[CATB_MAX_LAYERS][CATB_MAX_ANT], wi[CATB_MAX_LAYERS][CATB_MAX_ANT];
     for (int l = 0; l < L; l++)
       for (int a = 0; a < nb_rx_ant; a++) {
         double sr = 0, si = 0;
@@ -774,19 +799,80 @@ static void catb_publish_weights(catb_weight_ring_t *ring,
         }
         wr[l][a] = sr;
         wi[l][a] = si;
-        const double m = sr * sr + si * si;
-        if (m > wmax)
-          wmax = m;
       }
-    const double scale = (wmax > 0.0) ? (29000.0 / sqrt(wmax)) : 0.0; // headroom below Q15 full scale
-    for (int l = 0; l < L; l++)
+    // ONE normalisation, not two (§23). The only constraint that matters is the RU's combine:
+    // y = sum_a (x_a * conj(w_a)) >> 15 saturates unless sum_a(|wr|+|wi|) <= 32768. Normalising
+    // here to max-component 29000 and THEN L1-rescaling by ~0.12 in catb_bfw_attach quantised to
+    // Q15 twice and threw away ~3 bits — measured w[0]=(0,0) on BOTH sides, i.e. the weakest
+    // antennas vanished entirely and their terms dropped out of both y and h_eff. Normalise once,
+    // per (PRB, layer), straight to the L1 budget. Only the DIRECTION of w carries information
+    // (a common scale cancels between y = w^H x and h_eff = w^H H), so this is free.
+    for (int l = 0; l < L; l++) {
+      double l1 = 0.0;
+      for (int a = 0; a < nb_rx_ant; a++)
+        l1 += fabs(wr[l][a]) + fabs(wi[l][a]);
+      const double scale = (l1 > 0.0) ? (32767.0 / l1) : 0.0;
       for (int a = 0; a < nb_rx_ant; a++) {
         const size_t k = catb_w_index(prb, l, a, L, nb_rx_ant);
         rec->w[2 * k] = (int16_t)lrint(wr[l][a] * scale);
         rec->w[2 * k + 1] = (int16_t)lrint(wi[l][a] * scale);
       }
+      // Capture what was ACTUALLY WRITTEN at the PRB catb_bfw_attach will read (mid-band, layer 0).
+      // The wire showed w=(0,0) while singular_prb=0/106 said the maths was fine, so the loss is
+      // between "computed" and "quantised". Log the raw double, l1, scale and the stored int16 —
+      // that interval contains the bug and nothing else does.
+      if (l == 0 && prb == nb_rb / 2) {
+        dbg_l1 = l1;
+        dbg_scale = scale;
+        dbg_wr = wr[0][0];
+        dbg_wi = wi[0][0];
+        const size_t k0 = catb_w_index(prb, 0, 0, L, nb_rx_ant);
+        dbg_q_r = rec->w[2 * k0];
+        dbg_q_i = rec->w[2 * k0 + 1];
+      }
+    }
+  }
+  {
+    // TRUNCATION is the fault (measured: last_nz=1695 => only 53 of 106 PRBs ever written, and
+    // n_prb/2 lands on the first hole). Log EVERY truncating publish, not 1-in-500 — a rare probe
+    // already cost a run by sampling the wrong path. `src` names the call site: the two pass
+    // different buffer_length/re_per_prb and only one of them truncates.
+    // Sample PER CALL SITE. A single shared counter at %500 only ever caught src=1 (which is
+    // healthy: nonzero=3392/3392), so src=2's geometry was never observed. The reader's
+    // last_nz=1695 equals (105*2+1)*8+7 exactly — an 8-ANTENNA layout — so nb_rx_ant is the field
+    // that matters and it was never printed.
+    static long nq_src[3] = {0}, ntrunc = 0;
+    long nq = nq_src[(src >= 0 && src <= 2) ? src : 0]++;
+    if (dbg_written < nb_rb) {
+      if ((ntrunc++ % 200) == 0)
+        LOG_A(PHY, "[CATB TRUNC] src=%d nb_rb=%d written=%d break_prb=%d re_per_prb=%d"
+                   " buffer_length=%u (need %d)\n",
+              src, nb_rb, dbg_written, dbg_break_prb, re_per_prb, buffer_length,
+              (nb_rb - 1) * re_per_prb + re_per_prb / 2 + 1);
+    }
+    if ((nq % 100) == 1) {
+      // WRITER-SIDE SCAN, byte-identical to the reader's in catb_bfw_attach. The writer reports
+      // written=106 while the reader sees data only in elements 0..1695 (53 PRBs). Running the
+      // SAME scan on both sides of the ring is the only way to tell "the writer did not write it"
+      // from "the record changed in transit" — every other framing of this has been ambiguous.
+      long w_nz = 0, w_first = -1, w_last = -1;
+      const long w_elem = (long)nb_rb * L * nb_rx_ant;
+      for (long e = 0; e < w_elem && e < (long)(sizeof(rec->w) / (2 * sizeof(rec->w[0]))); e++)
+        if (rec->w[2 * e] || rec->w[2 * e + 1]) {
+          if (w_first < 0)
+            w_first = e;
+          w_last = e;
+          w_nz++;
+        }
+      LOG_A(PHY, "[CATB QUANT] src=%d nb_rb=%d n_ant=%d n_layers=%d written=%d midprb=%d"
+                 " q=(%d,%d) slot_used=%u n_sing=%d | WRITER nonzero=%ld/%ld first=%ld last=%ld\n",
+            src, nb_rb, nb_rx_ant, L, dbg_written, nb_rb / 2,
+            dbg_q_r, dbg_q_i, ring->write_idx % CATB_RING_DEPTH, n_sing,
+            w_nz, w_elem, w_first, w_last);
+    }
   }
   catb_ring_commit(ring, rec);
+  return n_sing;
 }
 
 // MMSE Rx function: nr_ulsch_mmse_2layers()
@@ -841,33 +927,55 @@ static int catb_ul_rx_enabled(void)
   return en;
 }
 
-// Read back the weights this DU most recently published. Same wideband mid-band PRB, layer 0
-// that oaioran.c catb_bfw_attach() puts on the wire, so the DU reconstructs exactly the vector
-// the RU applied. Returns antenna count, 0 if the ring has nothing yet.
-static int catb_read_last_weights(int16_t *out, int max_ant)
+// Read back the weights that were APPLIED TO THIS SLOT, recorded by oaioran.c catb_bfw_attach()
+// at C-plane build time. NOT the newest record: the RU combined slot N with the vector carried by
+// slot N's C-plane section, which the DU built some slots earlier. Equalising with a different
+// vintage leaves a residual complex scalar (mostly phase) that destroys high-order QAM.
+// Returns antenna count, 0 if no BFW went out for this slot (caller then assumes the degenerate
+// weight — unit on antenna 0 — which is exactly what the RU sends in that case).
+static catb_weight_ring_t *catb_get_ring(void);
+
+static int catb_read_applied_weights(int slot, int16_t *out, int max_ant)
 {
-  static catb_weight_ring_t *ring = NULL;
-  static long tries = 0;
-  if (ring == NULL) {
-    // Retry, do not latch: the ring is created by the export path on its first MU-IRC decode.
-    if ((tries++ % 2000) != 0)
-      return 0;
-    ring = catb_ring_open(0);
-    if (ring == NULL)
-      return 0;
-    LOG_A(PHY, "[CATB DU] weight ring mapped for receive after %ld attempts\n", tries);
-  }
-  catb_weight_rec_t rec;
-  if (!catb_ring_read(ring, 0, &rec) || rec.n_ant == 0)
+  // Use the EXPORT path's handle. This used to map a second, private handle with a
+  // `(tries++ % 2000) != 0` backoff, which deadlocked (§21): the first attempt happens before the
+  // ring exists and the next is at call 2000, but this function is only reached a few hundred
+  // times per run when nothing is decoding — so it returned 0 for entire runs. The DU then sat on
+  // its antenna-0 fallback while the RU combined with real weights, and no TB could decode.
+  // MEASURED: |h_eff|/|H_ant0| = 0.991 (the fallback identity) with n_w=0 on every sample.
+  // Same process, same ring — a second mapping was never needed.
+  catb_weight_ring_t *ring = catb_get_ring();
+  if (ring == NULL)
     return 0;
-  const int n = (rec.n_ant < max_ant) ? rec.n_ant : max_ant;
-  const int prb = rec.n_prb / 2;
-  for (int a = 0; a < n; a++) {
-    const size_t k = catb_w_index(prb, 0, a, rec.n_layers, rec.n_ant);
-    out[2 * a] = rec.w[2 * k];
-    out[2 * a + 1] = rec.w[2 * k + 1];
-  }
+  const int n = catb_applied_read(ring, slot, out, max_ant);
+  static long n_call = 0, n_hit = 0;
+  n_call++;
+  if (n > 0)
+    n_hit++;
+  if ((n_call % 2000) == 1)
+    LOG_A(PHY, "[CATB DU] applied_read hit/call = %ld/%ld\n", n_hit, n_call);
   return n;
+}
+
+// Shared export gate + ring handle. STEP 2 published weights as a passive by-product of the
+// MU-IRC receiver, which was free while the DU was a 16-antenna receiver on every symbol. STEP 3
+// breaks that: once the RU combines, the DU runs at 1 effective antenna on DATA symbols, the IRC
+// path stops engaging (g_mu_mimo_active goes 0 once throughput collapses), and weight production
+// dies — which starves the combining that caused it. Weight computation therefore has to be a
+// first-class step on REFERENCE symbols, not a side effect of decoding.
+static catb_weight_ring_t *catb_get_ring(void)
+{
+  static int en = -1;
+  static catb_weight_ring_t *ring = NULL;
+  if (en < 0) {
+    const char *e = getenv("OAI_CATB_WEIGHT_EXPORT");
+    en = (e && e[0] && e[0] != '0') ? 1 : 0;
+    if (en) {
+      ring = catb_ring_open(1);
+      LOG_A(PHY, "[CATB] weight export %s\n", ring ? "ON" : "FAILED to map ring");
+    }
+  }
+  return en ? ring : NULL;
 }
 
 // Must match nr-oru.c catb_is_ref_symbol() and VRTSIM_CATB_REF_SYMS. Default 2,7,11.
@@ -1131,7 +1239,17 @@ static void inner_rx(PHY_VARS_gNB *gNB,
   // antenna. Every VLA below and every downstream call is sized from nb_rx_ant, so switching it
   // here keeps the whole path self-consistent. ul_ch_estimates[] is still stored per REAL
   // antenna, so its indexing must use nb_rx_ant_true.
-  const int catb_comb = catb_ul_rx_enabled() && !catb_du_is_ref_symbol(symbol);
+  // A symbol is a REFERENCE symbol iff it carries DMRS — PHY knows this natively, so there is no
+  // reason to guess a symbol list. Publish the bitmap for the fronthaul layer, which cannot see it.
+  {
+    catb_weight_ring_t *r = catb_get_ring();
+    if (r != NULL && r->dmrs_mask != (uint16_t)rel15_ul->ul_dmrs_symb_pos) {
+      r->dmrs_mask = (uint16_t)rel15_ul->ul_dmrs_symb_pos;
+      LOG_A(PHY, "[CATB] DMRS symbol mask published 0x%04x\n", (unsigned)r->dmrs_mask);
+    }
+  }
+  const int catb_dmrs_sym = (rel15_ul->ul_dmrs_symb_pos >> symbol) & 1;
+  const int catb_comb = catb_ul_rx_enabled() && !catb_dmrs_sym;
   int nb_rx_ant = catb_comb ? 1 : nb_rx_ant_true;
   // ---- Cat-B STEP 4 CORE: WEIGHT STALENESS at the SOURCE (OAI_CATB_DELAY_SLOTS=d) --------
   // Delay the CHANNEL ESTIMATE itself, before anything reads it. An earlier version swapped
@@ -1206,13 +1324,180 @@ catb_ring_done:;
     dmrs_symbol = get_next_dmrs_symbol_in_slot(rel15_ul->ul_dmrs_symb_pos, rel15_ul->start_symbol_index, end_symbol);
   }
 
+  // ---- Cat-B STEP 3: weight computation on REFERENCE symbols -------------------------------
+  // Independent of the MU-IRC decode path: no g_mu_mimo_active, no log2_maxh, no dependence on
+  // the data-symbol receive mode. Runs where nb_rx_ant is still the true antenna count, which is
+  // the only place the DU still sees an uncombined 16-antenna view.
+  // EXIT-PATH CENSUS (§20). Weight production runs ~once per RUN while the RU consumes 26001
+  // sections, but the counters inside the block cannot say WHICH gate rejects — [CATB WDIAG] sits
+  // inside `wpart >= 0`, so its silence is ambiguous. Count every exit, exactly as the [CATB
+  // ATTACH] census did for §18/§19. Log counts, never a presence flag.
+  static long p_call = 0, p_comb = 0, p_notdmrs = 0, p_ant = 0, p_ring = 0, p_dup = 0,
+              p_nopart = 0, p_buf = 0, p_lowsum = 0, p_pub = 0, p_pub_su = 0;
+  p_call++;
+  if ((p_call % 20000) == 0)
+    LOG_A(PHY,
+          "[CATB PROD] calls=%ld comb=%ld notdmrs=%ld antmix=%ld ring=%ld dup=%ld nopartner=%ld"
+          " buf=%ld lowsum=%ld PUB_MU=%ld PUB_SU=%ld\n",
+          p_call, p_comb, p_notdmrs, p_ant, p_ring, p_dup, p_nopart, p_buf, p_lowsum, p_pub, p_pub_su);
+  if (catb_comb)
+    p_comb++;
+  else if (!catb_dmrs_sym)
+    p_notdmrs++;
+  else if (nb_rx_ant != nb_rx_ant_true)
+    p_ant++;
+  if (!catb_comb && catb_dmrs_sym && nb_rx_ant == nb_rx_ant_true) {
+    catb_weight_ring_t *ring = catb_get_ring();
+    static uint32_t pub_f = 0xffffffffu;
+    static int pub_s = -1;
+    static uint16_t pub_r = 0;
+    if (ring == NULL)
+      p_ring++;
+    else if (!(frame != pub_f || slot != pub_s || rel15_ul->rnti != pub_r))
+      p_dup++;
+    if (ring != NULL && (frame != pub_f || slot != pub_s || rel15_ul->rnti != pub_r)) {
+      // Partner scan: same PRB match + per-slot chest stamp as the IRC scan, but WITHOUT the
+      // MU regime gate. We only need both UEs' channel estimates to exist for this slot.
+      int wpart = -1;
+      for (int id = 0; id < gNB->max_nb_pusch; id++) {
+        if (id == ulsch_id)
+          continue;
+        const NR_gNB_ULSCH_t *u = &gNB->ulsch[id];
+        if (u->harq_process == NULL)
+          continue;
+        if (gNB->pusch_vars[id].mu_chest_frame != (int)frame || gNB->pusch_vars[id].mu_chest_slot != slot)
+          continue;
+        const nfapi_nr_pusch_pdu_t *p = &u->harq_process->ulsch_pdu;
+        if (p->rb_size != rel15_ul->rb_size || p->rb_start != rel15_ul->rb_start)
+          continue;
+        if (p->rnti == rel15_ul->rnti)
+          continue;
+        wpart = id;
+        break;
+      }
+      if (wpart < 0)
+        p_nopart++;
+      // MU-ONLY BY DEFAULT (§23). The SU fallback is opt-in via OAI_CATB_SU_BFW=1.
+      // Why it is OFF: the census that motivated it (nopartner=4317 vs PUBLISHED=114) was taken
+      // while §22's bug was live — the DU's ring was unmapped, so NOTHING decoded, so the
+      // scheduler stopped co-scheduling, so the partner scan failed. Cause and effect were
+      // inverted: the "production deadlock" was a SYMPTOM of §22, not an independent deadlock.
+      // And SU is harmful here: one wideband beam serves one UE, so it nulls the co-scheduled UE
+      // and kills its Msg3 (attach 2/2 -> 1/2, reproducible 3/3, independent of weight quality).
+      // The bootstrap needs no SU rung: with no weights the RU forwards all 16 antennas and the DU
+      // decodes per-antenna, which is how runs 1-3 reached attach 2/2. MU with identical PRBs is
+      // the configuration the 2x2 MMSE was built for — two layers, each nulling the other.
+      static int su_en = -1;
+      if (su_en < 0) {
+        const char *e = getenv("OAI_CATB_SU_BFW");
+        su_en = (e && e[0] && e[0] != '0') ? 1 : 0;
+        LOG_A(PHY, "[CATB] SU weight fallback %s\n", su_en ? "ON" : "OFF (MU only)");
+      }
+      if (wpart < 0 && !su_en) {
+        // No partner and SU disabled: publish nothing. The RU then sees no weights and forwards
+        // every antenna, which the DU's fallback already assumes — the two sides stay consistent.
+      } else
+      // SU FALLBACK (§20). MEASURED: the partner scan fails 97.4% of reachable calls (nopartner
+      // 4317 vs PUBLISHED 114), because weights -> decode -> throughput -> co-scheduling -> weights
+      // is a cycle. Once coverage reached 100% the data path collapsed, the scheduler stopped
+      // pairing the UEs, and production stopped for the rest of the run — 3.1 -> 0.0 Mbps.
+      // Publishing SINGLE-USER weights when there is no partner breaks the cycle.
+      //
+      // This needs NO change to catb_publish_weights: with the partner's channel ZEROED, its 2x2
+      // MMSE reduces algebraically to the correct one-user solution. G becomes diag(|h0|^2+nvar,
+      // nvar), so det = (|h0|^2+nvar)*nvar != 0 (not singular), invG[0][1] = 0, and
+      // w[0][a] = (nvar/det)*conj(h0[a]) — the matched filter, up to a real scale that cancels
+      // (§17 bug 6: only the DIRECTION of w matters). w[1] comes out zero and is never emitted
+      // anyway, since oaioran.c takes layer 0. Deriving the SU weights from the SAME expression
+      // also inherits its conjugation convention, rather than re-guessing it — re-guessing is what
+      // produced §15's residual phase rotation.
+      {
+        // Heap-backed via a TLS pointer: 2 x 16 x buffer_length x 4 B is ~160 kB, which belongs
+        // on neither the decode-thread stack nor the static TLS block (learned in nr-oru.c).
+        enum { CW_L = 2, CW_ANT = 16, CW_MAXRE = 4096 };
+        static __thread c16_t *cw_buf = NULL;
+        if (cw_buf == NULL)
+          cw_buf = aligned_alloc(32, (size_t)(CW_L * CW_ANT + 1) * CW_MAXRE * sizeof(c16_t));
+        if (!(cw_buf != NULL && buffer_length <= CW_MAXRE && nb_rx_ant_true <= CW_ANT))
+          p_buf++;
+        if (cw_buf != NULL && buffer_length <= CW_MAXRE && nb_rx_ant_true <= CW_ANT) {
+          c16_t (*ch2)[CW_ANT][CW_MAXRE] = (c16_t (*)[CW_ANT][CW_MAXRE])cw_buf;
+          c16_t *dump = cw_buf + (size_t)CW_L * CW_ANT * CW_MAXRE;
+          NR_gNB_PUSCH *pv_w = (wpart >= 0) ? &gNB->pusch_vars[wpart] : NULL;
+          for (int a = 0; a < nb_rx_ant_true; a++) {
+            nr_ulsch_extract_rbs(rxF[a], (c16_t *)pusch_vars->ul_ch_estimates[a], dump, ch2[0][a],
+                                 soffset + (symbol * frame_parms->ofdm_symbol_size),
+                                 dmrs_symbol * frame_parms->ofdm_symbol_size, a, dmrs_symbol_flag,
+                                 rel15_ul, frame_parms);
+            if (pv_w != NULL)
+              nr_ulsch_extract_rbs(rxF[a], (c16_t *)pv_w->ul_ch_estimates[a], dump, ch2[1][a],
+                                   soffset + (symbol * frame_parms->ofdm_symbol_size),
+                                   dmrs_symbol * frame_parms->ofdm_symbol_size, a, dmrs_symbol_flag,
+                                   rel15_ul, frame_parms);
+            else
+              memset(ch2[1][a], 0, (size_t)CW_MAXRE * sizeof(c16_t));
+          }
+          // Is the channel we are about to publish from actually populated? A zeroed channel makes
+          // G = H^H H + nvar I singular, publish_weights leaves the PRB at zero, and an ALL-ZERO
+          // weight vector goes on the wire (observed: w[0..3]=(0,0)(0,0)). MEASURE it — three
+          // inferred causes for that symptom were all wrong.
+          long s0sum = 0, s1sum = 0;
+          const int rpp = dmrs_symbol_flag ? 6 : 12;
+          for (int a = 0; a < nb_rx_ant_true; a++)
+            for (int k = 0; k < rel15_ul->rb_size * rpp && k < CW_MAXRE; k++) {
+              s0sum += abs(ch2[0][a][k].r) + abs(ch2[0][a][k].i);
+              s1sum += abs(ch2[1][a][k].r) + abs(ch2[1][a][k].i);
+            }
+          static long ndiag = 0;
+          if ((ndiag++ % 500) == 0)
+            LOG_A(PHY,
+                  "[CATB WDIAG] sym=%d dmrs=%d rpp=%d self_sum=%ld partner_sum=%ld "
+                  "(zero => estimate not ready on this symbol)\n",
+                  symbol, dmrs_symbol_flag, rpp, s0sum, s1sum);
+          // Publish only from a symbol whose channel is real; otherwise leave the slot UNMARKED so
+          // a LATER reference symbol in the same slot gets its turn. nb_rx_ant==16 holds only on
+          // reference symbols, but ul_ch_estimates is populated only after the first DMRS symbol
+          // is processed — the two windows overlap on the SECOND and later reference symbols.
+          // In SU mode s1sum is zero BY CONSTRUCTION, so it must not veto the publish. Only the
+          // channel actually being beamformed has to be real.
+          const int sums_ok = (s0sum > 1000) && (pv_w == NULL || s1sum > 1000);
+          if (!sums_ok)
+            p_lowsum++;
+          if (sums_ok) { // 8 is noise; a real channel is ~1e5
+            const int n_sing =
+                catb_publish_weights(ring, (int)frame, slot, rel15_ul->rnti, rel15_ul->rb_start,
+                                     rel15_ul->rb_size, nb_rx_ant_true, CW_MAXRE,
+                                     (const c16_t (*)[nb_rx_ant_true][CW_MAXRE])ch2, nvar, rpp, 1);
+            pub_f = frame; pub_s = slot; pub_r = rel15_ul->rnti;
+            if (pv_w != NULL)
+              p_pub++;
+            else
+              p_pub_su++;
+            static long npub = 0;
+            if ((npub++ % 500) == 0)
+              // nvar is logged because the SU determinant is PROPORTIONAL to it: nvar==0 zeroes
+              // every PRB (§20). w0 is logged because "published" is a presence flag and presence
+              // flags have lied here before — an all-zero vector publishes just as happily.
+              LOG_A(PHY, "[CATB] ref-symbol weight publish #%ld (sym %d, partner ulsch %d, "
+                         "self_sum=%ld partner_sum=%ld nvar=%u singular_prb=%d/%d)\n",
+                    npub, symbol, wpart, s0sum, s1sum, nvar, n_sing, rel15_ul->rb_size);
+          }
+        }
+      }
+    }
+  }
+
   if (catb_comb) {
     // Effective 1-antenna receive. rxF[0] holds the RU-combined stream; chFext[l][0] becomes
     // h_eff = sum_a conj(w[a]) * H[l][a], using the weights this DU published for this slot.
     int16_t w[CATB_MAX_ANT * 2];
-    const int n_w = catb_read_last_weights(w, nb_rx_ant_true);
+    const int n_w = catb_read_applied_weights(slot, w, nb_rx_ant_true);
     c16_t tmp[buffer_length] __attribute__((aligned(32)));
     c16_t dump[buffer_length] __attribute__((aligned(32)));
+    // PROBE B control (§21): antenna 0's channel measured in the SAME post-extraction domain as
+    // h_eff. Reading ul_ch_estimates directly was wrong — that is the raw frequency-domain buffer
+    // and its index i means something different, so the control read zeros.
+    long mh0 = 0;
     for (int aatx = 0; aatx < nb_layer; aatx++) {
       int32_t acc_r[buffer_length], acc_i[buffer_length];
       memset(acc_r, 0, sizeof(acc_r));
@@ -1234,14 +1519,27 @@ catb_ring_done:;
         // i.e. treat w as unit on antenna 0 only. Counted below so it is never silent.
         const int32_t wr = (n_w > a) ? w[2 * a] : ((a == 0) ? 32767 : 0);
         const int32_t wi = (n_w > a) ? w[2 * a + 1] : 0;
+        if (aatx == 0 && a == 0)
+          for (int i = 0; i < (int)buffer_length; i++)
+            mh0 += abs(tmp[i].r) + abs(tmp[i].i);
+        // ACCUMULATE FULL PRECISION, SHIFT ONCE (§24). The >>15 used to sit INSIDE this loop, so
+        // every one of the 16 antenna terms was truncated to an integer before being summed:
+        // with |tmp| ~ 137/RE and |w_a| ~ 2048, each term is 137*2048 >> 15 = 8.5 -> 8. Sixteen
+        // roundings compound, and h_eff came out at 0.22-0.36 of |H_ant0| where a coherent sum
+        // should approach 1. No overflow risk: w is L1-normalised (sum_a |w_a| <= 32768), so the
+        // accumulated magnitude is bounded by 32767 * 32768 = 1.07e9, inside int32.
         for (int i = 0; i < (int)buffer_length; i++) {
-          acc_r[i] += ((int32_t)tmp[i].r * wr + (int32_t)tmp[i].i * wi) >> 15;
-          acc_i[i] += ((int32_t)tmp[i].i * wr - (int32_t)tmp[i].r * wi) >> 15;
+          // NO SECOND CONJUGATE (§25) — must match the RU's combine exactly. W = G^-1 H^H already
+          // carries the conjugate, so h_eff = sum_a w_a H_a, not sum_a conj(w_a) H_a.
+          acc_r[i] += (int32_t)tmp[i].r * wr - (int32_t)tmp[i].i * wi;
+          acc_i[i] += (int32_t)tmp[i].r * wi + (int32_t)tmp[i].i * wr;
         }
       }
       for (int i = 0; i < (int)buffer_length; i++) {
-        chFext[aatx][0][i].r = (int16_t)(acc_r[i] > 32767 ? 32767 : (acc_r[i] < -32768 ? -32768 : acc_r[i]));
-        chFext[aatx][0][i].i = (int16_t)(acc_i[i] > 32767 ? 32767 : (acc_i[i] < -32768 ? -32768 : acc_i[i]));
+        const int32_t vr = acc_r[i] >> 15;
+        const int32_t vi = acc_i[i] >> 15;
+        chFext[aatx][0][i].r = (int16_t)(vr > 32767 ? 32767 : (vr < -32768 ? -32768 : vr));
+        chFext[aatx][0][i].i = (int16_t)(vi > 32767 ? 32767 : (vi < -32768 ? -32768 : vi));
       }
     }
     static long n_eff = 0, n_now = 0;
@@ -1249,6 +1547,28 @@ catb_ring_done:;
       n_now++;
     if ((n_eff++ % 20000) == 0)
       LOG_A(PHY, "[CATB DU] effective-channel symbols=%ld no_weights=%ld\n", n_eff, n_now);
+    // PROBE B (§21). Did the combined signal survive the fronthaul, and is h_eff non-degenerate?
+    // |rxFext| is the received combined stream; |chFext| is h_eff. The DU decodes this as pure
+    // noise (pwr == npwr, llr 0), so one of the two is collapsed. Compared against |ul_ch_estimates
+    // on antenna 0|, which is measured on UNCOMBINED reference symbols and is known-good — a
+    // control in the same units, since a lone magnitude has no scale to be judged against.
+    {
+      long mrx = 0, mheff = 0;
+      for (int i = 0; i < (int)buffer_length; i++) {
+        mrx += abs(rxFext[0][i].r) + abs(rxFext[0][i].i);
+        mheff += abs(chFext[0][0][i].r) + abs(chFext[0][0][i].i);
+      }
+      // Only symbols carrying signal, and often — the previous cadence (every 20000) fired ONCE in
+      // a whole run, and on an n_w=0 fallback symbol, so it measured the wrong path entirely.
+      static long nb = 0;
+      if (mrx > 0 && (nb++ % 200) == 0)
+        LOG_A(PHY,
+              "[CATB MAG-B] slot=%d sym=%d n_w=%d len=%u |rx_combined|=%ld |h_eff|=%ld |H_ant0|=%ld"
+              " heff/H=%.3f w[0..3]=(%d,%d)(%d,%d)(%d,%d)(%d,%d)\n",
+              slot, symbol, n_w, buffer_length, mrx, mheff, mh0,
+              mh0 ? (double)mheff / (double)mh0 : -1.0,
+              w[0], w[1], w[2], w[3], w[4], w[5], w[6], w[7]);
+    }
   } else
   for (int aarx = 0; aarx < nb_rx_ant; aarx++) {
     for (int aatx = 0; aatx < nb_layer; aatx++) {
@@ -1638,15 +1958,41 @@ catb_ring_done:;
               LOG_A(PHY, "[CATB] weight export %s\n", catb_ring ? "ON" : "FAILED to map ring");
             }
           }
-          if (catb_export && catb_ring) {
+          // src=2 IS OFF BY DEFAULT (§23). MEASURED, both sites in one run:
+          //   src=1 (ref-symbol): WRITER nonzero=3392/3392 last=3391  -- healthy, full record
+          //   src=2 (this one):   WRITER nonzero=1696/3392 last=1695, mid-PRB q=(0,0)
+          // chF2 is packed at 6 REs/PRB on a DMRS symbol (extent 636) while buffer_length says
+          // 1272 (12/PRB). So re = prb*12+6 exceeds the populated region from prb 53 up
+          // (53*12+6 = 642 > 636) and reads ZEROS — no break, no truncation, silent garbage.
+          // Both sites share one ring, so this one CLOBBERS src=1's good records: the reader's
+          // cached record showed exactly last_nz=1695 and iq=(0,0) at n_prb/2, which is why the
+          // combined path has produced zero weights all along.
+          // §17 already moved weight production to reference symbols as a first-class step rather
+          // than a side effect of decoding; this passive Step-2 exporter is vestigial. Keep it
+          // reachable for A/B via OAI_CATB_PUB_IRC=1, but never let it write by default.
+          static int pub_irc = -1;
+          if (pub_irc < 0) {
+            const char *e = getenv("OAI_CATB_PUB_IRC");
+            pub_irc = (e && e[0] && e[0] != '0') ? 1 : 0;
+            LOG_A(PHY, "[CATB] MU-IRC passive weight export %s\n", pub_irc ? "ON" : "OFF (ref-symbol path only)");
+          }
+          if (pub_irc && catb_export && catb_ring) {
             static uint32_t last_f = 0xffffffffu;
             static int last_s = -1;
             static uint16_t last_r = 0;
             if (frame != last_f || slot != last_s || rel15_ul->rnti != last_r) {
               last_f = frame; last_s = slot; last_r = rel15_ul->rnti;
+              // RE STRIDE — §17 bug 5, which survived at THIS call site. A hardcoded 12 against a
+              // DMRS-packed buffer (6 REs/PRB) does two things, both measured: `re = prb*12+6`
+              // hits 642 >= buffer_length(636) and BREAKS at prb 53, leaving PRBs 53..105 never
+              // written (last_nz=1695, and catb_bfw_attach reads n_prb/2 = 53 — the first hole);
+              // and for prb < 53 it samples another PRB's RE. Derive the stride from the two
+              // arguments that describe the buffer, so they cannot disagree.
+              const int rpp2 = (rel15_ul->rb_size > 0) ? (int)(buffer_length / rel15_ul->rb_size) : 12;
               catb_publish_weights(catb_ring, (int)frame, slot, rel15_ul->rnti, rel15_ul->rb_start,
                                    rel15_ul->rb_size, nb_rx_ant, buffer_length,
-                                   (const c16_t (*)[nb_rx_ant][buffer_length])chF2, nvar);
+                                   (const c16_t (*)[nb_rx_ant][buffer_length])chF2, nvar,
+                                   (rpp2 == 6 || rpp2 == 12) ? rpp2 : 12, 2);
             }
           }
         }

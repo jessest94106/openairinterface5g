@@ -36,5 +36,12 @@ void xran_oru_send_prach(uint32_t *prachF, int aarx, int frame, int slot, int sy
 void xran_oru_send_pusch(uint32_t *puschF, int aarx, int frame, int slot, int symbol);
 // Cat-B 3a.3: received UL beamforming weights for (slot,symbol). Returns antenna count, 0 if none.
 int catb_bfw_get(int slot, int symbol, int16_t *out, int max_ant);
+// Cat-B 3a.3: the UL C-plane carries ONE section per TDD period, headed by the period's first UL
+// slot, so every UL slot of a period is combined with that one slot's weights. Both the RU (apply)
+// and the DU (record what was applied) must resolve through this, or they disagree and no TB
+// decodes. Returns `slot` unchanged under FDD or when the TDD pattern has no UL slot.
+int catb_period_first_ul_slot(int slot);
+// Slots per TDD period, 0 when there is no period scoping (FDD / no UL slot in the pattern).
+int catb_tdd_period(void);
 
 #endif

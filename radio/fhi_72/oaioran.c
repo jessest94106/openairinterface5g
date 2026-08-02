@@ -42,6 +42,7 @@
 #include "oran_isolate.h"
 #include "oran-init.h"
 #include "oaioran.h"
+#include "oaioran_ru.h" // catb_period_first_ul_slot / catb_tdd_period — shared with the RU side
 #include <rte_ethdev.h>
 
 #include "oran-config.h" // for g_kbar
@@ -69,7 +70,7 @@ int xran_is_prach_slot(uint8_t PortId, uint32_t subframe_id, uint32_t slot_id);
 // all the latency experiment needs (staleness is the variable; granularity is not).
 #define CATB_BFW_ANT 16
 #define CATB_BFW_EXTBUF 512 // 16 ant x 4 B + ext-1 header; static, never allocate in this path
-static void catb_bfw_attach(struct xran_prb_elm *pRbElm)
+static void catb_bfw_attach(struct xran_prb_elm *pRbElm, int air_slot, int sym_idx)
 {
   static int en = -1;
   static catb_weight_ring_t *ring = NULL;
@@ -77,24 +78,54 @@ static void catb_bfw_attach(struct xran_prb_elm *pRbElm)
     const char *e = getenv("OAI_CATB_BFW");
     en = (e && e[0] && e[0] != '0') ? 1 : 0;
   }
-  if (!en || pRbElm == NULL)
-    return;
+  // Exit-reason census: 95% of DATA symbols were leaving here with no ext-1 and the aggregate
+  // counters could not say which branch. Count every path rather than infer one.
+  static long c_call = 0, c_off = 0, c_nomap = 0, c_dmrs = 0, c_readfail = 0, c_ok = 0;
+  c_call++;
+  if (!en || pRbElm == NULL) { c_off++; return; }
   // RETRY the mapping instead of caching failure. This path first runs while the C-plane is
   // being built for the very first UL slot — long before any UE has attached, and therefore
   // before PHY has created the ring (PHY creates it on its first MU-IRC decode). A one-shot
   // init here found no ring, latched OFF, and the feature silently never ran.
   if (ring == NULL) {
     static long tries = 0;
-    if ((tries++ % 2000) != 0)
-      return;
+    if ((tries++ % 2000) != 0) { c_nomap++; return; }
     ring = catb_ring_open(0);
-    if (ring == NULL)
-      return;
+    if (ring == NULL) { c_nomap++; return; }
     LOG_A(HW, "[CATB] UL C-plane BFW emission ON (ring mapped after %ld attempts)\n", tries);
   }
+  // DMRS symbols must stay per-antenna: the DU cannot estimate the channel from combined data,
+  // which is the whole reason Cat-B needs an uncombined reference. PHY publishes the bitmap
+  // because this layer has no PUSCH PDU.
+  if (sym_idx >= 0 && ((ring->dmrs_mask >> sym_idx) & 1u)) { c_dmrs++; return; }
+  // CACHE the last good record. PHY writes the ring during DECODE, once per (frame, slot, rnti),
+  // but the C-plane for EVERY UL slot of a TDD period is built BEFORE those slots are decoded.
+  // Production is 1 record/period; consumption needs 1 per UL slot. Measured: weights only ever
+  // landed on the FIRST UL slot of each period (store histogram peaked at slots 1,6,11,16 while
+  // slots 2,3,4 / 7,8,9 asked 9128 times and hit 0) -> ~5% coverage.
+  //
+  // Reusing the most recent record is CORRECT here, not a shortcut: in a real Cat-B loop the
+  // weights are ALWAYS behind the data they are applied to — §1's budget (Ta3_up 200us +
+  // T_proc + T1a_cp_ul 285us = 485us against a 500us slot) forces 1-2 slots of staleness by
+  // construction. The vintage is preserved: rec.frame/rec.slot travel into catb_applied_write()
+  // below, so the DU equalises with exactly the vector the RU applied, and its true age is
+  // recorded rather than assumed to be zero.
   static catb_weight_rec_t rec;
-  if (!catb_ring_read(ring, 0, &rec) || rec.n_ant == 0)
-    return;
+  static int rec_valid = 0;
+  {
+    catb_weight_rec_t fresh;
+    if (catb_ring_read(ring, 0, &fresh) && fresh.n_ant != 0) {
+      rec = fresh;
+      rec_valid = 1;
+    } else if (!rec_valid) {
+      c_readfail++;
+      return; // nothing has ever been published — genuinely no weights yet
+    }
+  }
+  c_ok++;
+  if ((c_call % 20000) == 0)
+    LOG_A(HW, "[CATB ATTACH] calls=%ld off=%ld nomap=%ld dmrs_skip=%ld read_fail=%ld attached=%ld\n",
+          c_call, c_off, c_nomap, c_dmrs, c_readfail, c_ok);
   // Wideband: one weight vector across antennas, taken from the mid-band PRB. 3b refines this
   // to per-PRB/bundle; Step 2 measured adjacent-PRB weight correlation at 0.91-0.96, so this
   // gives up real but bounded accuracy.
@@ -105,6 +136,104 @@ static void catb_bfw_attach(struct xran_prb_elm *pRbElm)
     const size_t k = catb_w_index(prb, 0 /*layer 0*/, a, rec.n_layers, rec.n_ant);
     iq[2 * a] = rec.w[2 * k];
     iq[2 * a + 1] = rec.w[2 * k + 1];
+  }
+  // THE MISSING LINK. PHY writes q=(1348,32) at mid-PRB layer 0 ([CATB QUANT]) and the wire carries
+  // (0,0) — the only code in between is right here. The one window that used to show this was the
+  // "BFW normalised" log, but it fires only when l1 > 32767, and normalising to exactly 32767
+  // silenced it. Log the record's identity AND the extracted vector unconditionally, so a
+  // stale/zero record can never again hide behind a rescale that no longer happens.
+  {
+    static long nx = 0;
+    if ((nx++ % 2000) == 1) {
+      long l1dbg = 0;
+      for (int a = 0; a < nant; a++)
+        l1dbg += labs(iq[2 * a]) + labs(iq[2 * a + 1]);
+      // WHERE is the data? PHY logs a non-zero write at this exact index ([CATB QUANT] k0), yet we
+      // read zero. Two explanations remain and this separates them: scan the whole record for
+      // non-zeros. All-zero => the cached record is stale/never-written. Non-zeros elsewhere =>
+      // writer and reader disagree on the w[] layout, and first_nz names the offset.
+      // last_nz discriminates the two layouts that both fit nonzero=1590/3392:
+      //   last_nz ~= 3375 => layer 0 filled across ALL PRBs, layer 1 ~zero (interleaved, expected)
+      //   last_nz ~= 1695 => only PRBs 0..52 written at all, i.e. the publish loop stops halfway
+      // write_idx says whether attach is even SEEING new publications: the record has been frozen
+      // at one (frame,slot) for entire runs. Compare against PHY's own view in [CATB QUANT].
+      long n_nz = 0, first_nz = -1, last_nz = -1;
+      const long n_elem = (long)rec.n_prb * rec.n_layers * rec.n_ant;
+      for (long e = 0; e < n_elem && e < (long)(sizeof(rec.w) / (2 * sizeof(rec.w[0]))); e++)
+        if (rec.w[2 * e] || rec.w[2 * e + 1]) {
+          if (first_nz < 0)
+            first_nz = e;
+          last_nz = e;
+          n_nz++;
+        }
+      LOG_A(HW, "[CATB EXTRACT] rec f=%u s=%u n_prb=%u n_ant=%u n_layers=%u | prb=%d k0=%zu"
+                " iq[0..3]=(%d,%d)(%d,%d) l1=%ld | nonzero=%ld/%ld first_nz=%ld last_nz=%ld"
+                " widx=%u\n",
+            rec.frame, rec.slot, rec.n_prb, rec.n_ant, rec.n_layers, prb,
+            catb_w_index(prb, 0, 0, rec.n_layers, rec.n_ant),
+            iq[0], iq[1], iq[2], iq[3], l1dbg, n_nz, n_elem, first_nz, last_nz,
+            ring->write_idx);
+    }
+  }
+  // NORMALISE before it leaves. MMSE weights w = (H^H H + nvar I)^-1 h are UNNORMALISED — measured
+  // |w| ~ 0.7 in Q15 per antenna. The RU's combine does sum_a (x_a * conj(w_a)) >> 15 over 16
+  // antennas and saturates to int16, so an L1 norm above 1.0 clips every sample. Only the
+  // DIRECTION of w matters (the DU builds h_eff from the same vector, so a common scale cancels),
+  // which makes rescaling free. Target sum_a(|I|+|Q|) <= 32768 => the combined output is bounded
+  // by |x| and cannot saturate.
+  {
+    long l1 = 0;
+    for (int a = 0; a < nant; a++)
+      l1 += labs(iq[2 * a]) + labs(iq[2 * a + 1]);
+    if (l1 > 32767) {
+      for (int a = 0; a < nant; a++) {
+        iq[2 * a] = (int16_t)((long)iq[2 * a] * 32767 / l1);
+        iq[2 * a + 1] = (int16_t)((long)iq[2 * a + 1] * 32767 / l1);
+      }
+      static long nn = 0;
+      if ((nn++ % 2000) == 0)
+        LOG_A(HW, "[CATB] BFW normalised: L1 %ld -> 32767 (w[0]=%d,%d)\n", l1, iq[0], iq[1]);
+    }
+  }
+  // VINTAGE: record the exact vector going onto the wire, tagged with the estimate it came from.
+  // The receive path reads THIS back instead of "the newest record" — the RU un-combines with what
+  // it was actually given. Reading the newest left a residual phase rotation between w_applied and
+  // w_assumed and nothing decoded (§15).
+  //
+  // PERIOD SCOPING (§19). The UL C-plane emits ONE section per TDD period, headed by the period's
+  // FIRST UL slot, and the RU applies that single vector to every UL slot of the period. Sections
+  // built for the period's other UL slots are never transmitted (measured: the RU's store histogram
+  // peaks only at slots 1,6,11,16). Recording them per-slot made the DU equalise slots 2,3,4 with a
+  // vector the RU never applied — the §15 mismatch again, one layer up. So record the TRANSMITTED
+  // section's vector across its whole period and ignore the others.
+  const int first_ul = catb_period_first_ul_slot(air_slot);
+  // MEASURE the asymmetry rather than assume it: if a non-transmitted section always carried the
+  // same vector as the transmitted one, per-slot recording was harmless and the fault is elsewhere.
+  {
+    static int16_t first_iq[CATB_BFW_ANT * 2];
+    static long n_same = 0, n_diff = 0, n_cmp = 0;
+    if (air_slot == first_ul) {
+      memcpy(first_iq, iq, sizeof(first_iq));
+    } else {
+      if (memcmp(iq, first_iq, (size_t)nant * 2 * sizeof(int16_t)) == 0)
+        n_same++;
+      else
+        n_diff++;
+      if ((n_cmp++ % 20000) == 0)
+        LOG_A(HW,
+              "[CATB PERIOD] untransmitted section vs applied: same=%ld diff=%ld"
+              " (applied w[0]=%d,%d this w[0]=%d,%d)\n",
+              n_same, n_diff, first_iq[0], first_iq[1], iq[0], iq[1]);
+    }
+  }
+  if (air_slot == first_ul) {
+    const int period = catb_tdd_period();
+    const int base = period ? air_slot - (air_slot % period) : air_slot;
+    const int n = period ? period : 1;
+    // Every slot of the period, not just the UL ones: the UL demod never reads a DL slot, so
+    // filtering them out would only be more code for the same result.
+    for (int i = 0; i < n && base + i < CATB_SLOTS_PER_FRAME; i++)
+      catb_applied_write(ring, base + i, nant, iq, rec.frame, rec.slot);
   }
   // EXACT pattern from the xran sample app (app/src/app_io_fh_xran.c:1042) — the canonical
   // working caller. Six earlier attempts diverged from it on every point that matters:
@@ -1277,7 +1406,7 @@ int xran_fh_tx_send_slot(ru_info_t *ru, int frame, int slot, uint64_t timestamp)
           // the point is to prove the bytes reach the wire before anything depends on them.
           // xran_cp_populate_section_ext_1() is an API the APPLICATION must call: it is declared
           // in xran_cp_api.h and never invoked inside xran, which is why nothing emits BFW today.
-          catb_bfw_attach(pRbElm);
+          catb_bfw_attach(pRbElm, (int)slot, (int)sym_idx);
           int numRB, startRB;
 #if defined F_RELEASE
           numRB = pRbElm->UP_nRBSize;
