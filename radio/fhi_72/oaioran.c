@@ -175,6 +175,27 @@ static void catb_bfw_attach(struct xran_prb_elm *pRbElm, int air_slot, int sym_i
             ring->write_idx);
     }
   }
+  // SYNTHETIC REFERENCE VECTOR (§26), OAI_CATB_WSYNTH=1. Magnitude fingerprinting is exhausted:
+  // per-antenna per-RE SNR is only ~4.6 dB (RU rms|x_a| 18-25 against a sqrt(2)*sigma=9.9 floor),
+  // so |x_a| is noise-dominated and cannot resolve a 32x |h_a| structure. Inject a vector whose
+  // ANTENNA ORDER is unmistakable instead: w_a = (240*(a+1), 0) -> 240,480,...,3840. Its L1 is
+  // 240*136 = 32640 <= 32767, so the normaliser below is a no-op and cannot rescale or reorder it.
+  // The RU logs what it receives. In order => the wire and the antenna mapping are 1:1, and the
+  // fault is WHICH channel the DU solved against. Permuted/scrambled => the mapping is the bug.
+  // Diagnostic only: this destroys decoding for the run, by design.
+  {
+    static int synth = -1;
+    if (synth < 0) {
+      const char *e = getenv("OAI_CATB_WSYNTH");
+      synth = (e && e[0] && e[0] != '0') ? 1 : 0;
+      LOG_A(HW, "[CATB] synthetic BFW ramp %s\n", synth ? "ON (DIAGNOSTIC — decoding disabled)" : "off");
+    }
+    if (synth)
+      for (int a = 0; a < nant; a++) {
+        iq[2 * a] = (int16_t)(240 * (a + 1));
+        iq[2 * a + 1] = 0;
+      }
+  }
   // NORMALISE before it leaves. MMSE weights w = (H^H H + nvar I)^-1 h are UNNORMALISED — measured
   // |w| ~ 0.7 in Q15 per antenna. The RU's combine does sum_a (x_a * conj(w_a)) >> 15 over 16
   // antennas and saturates to int16, so an L1 norm above 1.0 clips every sample. Only the
@@ -261,7 +282,26 @@ static void catb_bfw_attach(struct xran_prb_elm *pRbElm, int air_slot, int sym_i
   const int hdr = RTE_PKTMBUF_HEADROOM + sizeof(struct xran_ecpri_hdr) + sizeof(struct xran_cp_radioapp_section1_header);
   ext_buf += hdr;
   ext_len -= hdr;
-  const int32_t len = xran_cp_populate_section_ext_1(ext_buf, ext_len, iq, pRbElm);
+  // RAW BYTES IN (§26). The RU receives every value floored to 8 bits (sent 240,480,..1920 ->
+  // got 0,256,..1792 = value & 0xFF00), yet xran does a plain memcpy and the size is right
+  // (extLen=17 = 4 hdr + 64 payload). Neither byte-order story fits, so dump the actual bytes on
+  // both sides rather than reason about them.
+  { static long n = 0;
+    if ((n++ % 20000) == 1) {
+      const uint8_t *b = (const uint8_t *)iq;
+      LOG_A(HW, "[CATB BYTES-DU] iq[0..3]=%d,%d,%d,%d raw=%02x %02x %02x %02x %02x %02x %02x %02x\n",
+            iq[0], iq[1], iq[2], iq[3], b[0], b[1], b[2], b[3], b[4], b[5], b[6], b[7]);
+    } }
+  // BYTE ORDER (§27). O-RAN carries BFW IQ in NETWORK byte order, and the RU parses big-endian —
+  // but xran_cp_populate_section_ext_1() just memcpy's this buffer, so host little-endian went
+  // straight onto the wire and every I/Q sample arrived byte-transposed. MEASURED: DU emitted
+  // `f0 00 00 00 e0 01 00 00` (LE 240,0,480,0) for a synthetic ramp. Swap into a separate buffer:
+  // `iq` itself must stay host-order because catb_applied_write() below records it for the DU's
+  // own h_eff, and that side never goes through the wire.
+  static int16_t iq_be[CATB_BFW_ANT * 2];
+  for (int i = 0; i < nant * 2; i++)
+    iq_be[i] = (int16_t)htons((uint16_t)iq[i]);
+  const int32_t len = xran_cp_populate_section_ext_1(ext_buf, ext_len, iq_be, pRbElm);
   if (len <= 0) {
     static int warned = 0;
     if (!warned++)

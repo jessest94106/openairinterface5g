@@ -726,7 +726,8 @@ static int catb_publish_weights(catb_weight_ring_t *ring,
     return -1;
   int n_sing = 0;
   double dbg_l1 = 0.0, dbg_scale = 0.0, dbg_wr = 0.0, dbg_wi = 0.0;
-  int dbg_q_r = 0, dbg_q_i = 0, dbg_break_prb = -1, dbg_written = 0;
+  int dbg_q_r = 0, dbg_q_i = 0, dbg_break_prb = -1, dbg_written = 0, dbg_wzero = 0;
+  double dbg_hspread = -1.0, dbg_wspread = -1.0, dbg_dd = 0.0;
   const int L = CATB_MAX_LAYERS;
   catb_weight_rec_t *rec = catb_ring_begin(ring);
   rec->frame = (uint16_t)frame;
@@ -821,7 +822,7 @@ static int catb_publish_weights(catb_weight_ring_t *ring,
       // The wire showed w=(0,0) while singular_prb=0/106 said the maths was fine, so the loss is
       // between "computed" and "quantised". Log the raw double, l1, scale and the stored int16 —
       // that interval contains the bug and nothing else does.
-      if (l == 0 && prb == nb_rb / 2) {
+      if (l == 0 && prb == 26) { // PRB 26 to match the RU's [CATB XPROF]; nb_rb/2 straddles DC
         dbg_l1 = l1;
         dbg_scale = scale;
         dbg_wr = wr[0][0];
@@ -829,6 +830,43 @@ static int catb_publish_weights(catb_weight_ring_t *ring,
         const size_t k0 = catb_w_index(prb, 0, 0, L, nb_rx_ant);
         dbg_q_r = rec->w[2 * k0];
         dbg_q_i = rec->w[2 * k0 + 1];
+        // DEGENERACY DIAGNOSIS (§26). Observed w[0..3]=(22380,-768)(0,0)(0,0)(0,0): all energy on
+        // antenna 0, the other 15 quantised to zero, so there is no array gain and "coherence"
+        // is trivially 1 (a one-term sum). Three candidate causes, and these four numbers
+        // separate them:
+        //   h_max/h_min ~ 1  + w_max/w_min huge  => the SOLVE is degenerate (ill-conditioned G)
+        //   h_max/h_min huge                     => the CHANNEL ESTIMATE is on one antenna only
+        //   w spread fine before scaling         => the L1 NORMALISATION is crushing the rest
+        // dd is the Gram determinant magnitude; a tiny dd means G is near-singular.
+        double hmax = 0.0, hmin = 1e300, wmax = 0.0, wmin = 1e300;
+        int n_wzero = 0;
+        for (int a = 0; a < nb_rx_ant; a++) {
+          const double hm = fabs(hr[0][a]) + fabs(hi[0][a]);
+          const double wm = fabs(wr[0][a]) + fabs(wi[0][a]);
+          if (hm > hmax) hmax = hm;
+          if (hm < hmin) hmin = hm;
+          if (wm > wmax) wmax = wm;
+          if (wm < wmin) wmin = wm;
+          if (lrint(wr[0][a] * scale) == 0 && lrint(wi[0][a] * scale) == 0) n_wzero++;
+        }
+        dbg_hspread = hmin > 0.0 ? hmax / hmin : -1.0;
+        dbg_wspread = wmin > 0.0 ? wmax / wmin : -1.0;
+        dbg_wzero = n_wzero;
+        dbg_dd = dd;
+        // ANTENNA FINGERPRINT, DU side (§26). Compare against the RU's [CATB XPROF] |x_a| profile
+        // at the same PRB. Same ordering => the mapping is 1:1 and the fault is elsewhere; a
+        // permutation => w_a is applied to the wrong x_a, giving exactly 1/sqrt(16).
+        {
+          char hb[320];
+          int ho = 0;
+          for (int a = 0; a < nb_rx_ant; a++)
+            ho += snprintf(hb + ho, sizeof(hb) - ho, "%ld,",
+                           (long)(fabs(hr[0][a]) + fabs(hi[0][a])));
+          // rb_start/rb_size so the RU's ABSOLUTE PRB can be matched to this ALLOCATION-
+          // relative one; nr_ulsch_extract_rbs packs from rb_start, so prb here is an offset.
+          LOG_A(PHY, "[CATB HPROF] prb=%d rb_start=%d rb_size=%d |h_a|=%s\n",
+                prb, rb_start, nb_rb, hb);
+        }
       }
     }
   }
@@ -864,11 +902,12 @@ static int catb_publish_weights(catb_weight_ring_t *ring,
           w_last = e;
           w_nz++;
         }
-      LOG_A(PHY, "[CATB QUANT] src=%d nb_rb=%d n_ant=%d n_layers=%d written=%d midprb=%d"
-                 " q=(%d,%d) slot_used=%u n_sing=%d | WRITER nonzero=%ld/%ld first=%ld last=%ld\n",
-            src, nb_rb, nb_rx_ant, L, dbg_written, nb_rb / 2,
-            dbg_q_r, dbg_q_i, ring->write_idx % CATB_RING_DEPTH, n_sing,
-            w_nz, w_elem, w_first, w_last);
+      LOG_A(PHY, "[CATB QUANT] src=%d nb_rb=%d n_ant=%d written=%d q=(%d,%d) n_sing=%d"
+                 " | WRITER nonzero=%ld/%ld last=%ld"
+                 " | DEGEN h_spread=%.2e w_spread=%.2e w_zeroed=%d/%d dd=%.3e\n",
+            src, nb_rb, nb_rx_ant, dbg_written, dbg_q_r, dbg_q_i, n_sing,
+            w_nz, w_elem, w_last,
+            dbg_hspread, dbg_wspread, dbg_wzero, nb_rx_ant, dbg_dd);
     }
   }
   catb_ring_commit(ring, rec);

@@ -1401,26 +1401,88 @@ static void receive_pusch_catb(void *args)
       // BY CONSTRUCTION, which is why the figure sat at 0.25 regardless of the conjugation change.
       // Use the low positive-frequency bins (1..nre_half), which carry the allocation, and average
       // the ratio over many REs so one bad RE cannot set the answer.
-      const int nre_half = (fp->N_RB_UL * 12) / 2;
-      double coh_sum = 0.0;
-      int coh_n = 0;
-      for (int re = 1; re < nre_half && re < fp->ofdm_symbol_size; re += 37) {
-        long long sr = 0, si = 0, scal = 0;
-        for (int a = 0; a < ((n_w < n_ant) ? n_w : n_ant); a++) {
-          const long long xr = ant_ptr[a][re].r, xi = ant_ptr[a][re].i;
-          const long long wr = w[2 * a], wi = w[2 * a + 1];
-          const long long tr = xr * wr - xi * wi, ti = xr * wi + xi * wr; // must match the combine
-          sr += tr;
-          si += ti;
-          scal += llabs(tr) + llabs(ti);
+      // BOTH CONVENTIONS ON THE SAME SAMPLES. Degeneracy is excluded (h_spread 6.6, w_spread 8.0,
+      // w_zeroed 0/16, dd 4.6e19) yet coherence is 0.25 = 1/sqrt(16) with well-formed weights, so
+      // the fault is the PAIRING of w to x. Evaluating x*w and x*conj(w) side by side settles which
+      // convention is right in ONE run instead of an A/B across two — and if BOTH read ~0.25, the
+      // conjugation is a red herring and w simply does not correspond to this x at all.
+      // PER-PRB COHERENCE (§26). The weights come from ONE PRB — catb_bfw_attach takes
+      // rec.n_prb/2 = 53 — but this probe was sampling raw subcarriers 1..631, i.e. OTHER PRBs.
+      // Measuring PRB 53's weights against PRB 0-52's channel is incoherent by construction, so
+      // the 0.25 readings proved nothing. Sample per PRB, mapped through first_carrier_offset, and
+      // print the weights' OWN PRB alongside distant ones:
+      //   own ~1.0, distant ~0.25  => the wideband single-vector application IS the loss
+      //   own ~0.25                => the weights are wrong at their own frequency; note PRB 53
+      //                               sits next to DC for 106 PRB in a 1536-pt FFT, so the mid-PRB
+      //                               choice itself is suspect.
+      const int nrb = fp->N_RB_UL;
+      const int probe_prb[4] = {0, nrb / 4, nrb / 2, (3 * nrb) / 4};
+      char buf[256];
+      int off = 0;
+      for (int pi_ = 0; pi_ < 4; pi_++) {
+        const int prb = probe_prb[pi_];
+        double cp = 0.0;
+        int cn = 0;
+        for (int k = 0; k < 12; k += 4) {
+          const int re = (fp->first_carrier_offset + prb * 12 + k) % fp->ofdm_symbol_size;
+          long long pr = 0, pq = 0, pcal = 0;
+          for (int a = 0; a < ((n_w < n_ant) ? n_w : n_ant); a++) {
+            const long long xr = ant_ptr[a][re].r, xi = ant_ptr[a][re].i;
+            const long long wr = w[2 * a], wi = w[2 * a + 1];
+            const long long tr = xr * wr - xi * wi, ti = xr * wi + xi * wr;
+            pr += tr; pq += ti; pcal += llabs(tr) + llabs(ti);
+          }
+          if (pcal > 0) { cp += (double)(llabs(pr) + llabs(pq)) / (double)pcal; cn++; }
         }
-        if (scal > 0) {
-          coh_sum += (double)(llabs(sr) + llabs(si)) / (double)scal;
-          coh_n++;
-        }
+        off += snprintf(buf + off, sizeof(buf) - off, " prb%d=%.3f", prb, cn ? cp / cn : -1.0);
       }
-      LOG_A(PHY, "[CATB COH] slot=%d sym=%d nre=%d coherence=%.3f (1.0=coherent, 0.25=random)\n",
-            slot, symbol, coh_n, coh_n ? coh_sum / coh_n : -1.0);
+      LOG_A(PHY, "[CATB COH] slot=%d sym=%d w_from_prb=%d |%s (1.0=coherent, 0.25=random)\n",
+            slot, symbol, nrb / 2, buf);
+      // ANTENNA FINGERPRINT (§26). Coherence is ~0.25 at EVERY PRB including the weights' own, so
+      // the fault is not frequency — it is the pairing of w_a to x_a. Log the per-antenna |x|
+      // profile at the weights' PRB; the DU logs its |h| profile at the same PRB. h_spread ~17x
+      // makes the profile a strong fingerprint: if the two line up the mapping is 1:1, if they are
+      // a permutation then w_a meets the wrong x_a, which yields exactly 1/sqrt(16).
+      {
+        // POWER over the PRB's 12 REs, not one RE. A single RE sits at ~6 dB here
+        // (|x| ~ 20-30 against a 2*sigma*0.8 ~ 11 noise floor for VRTSIM_RX_NOISE_SIGMA=7), so a
+        // one-RE profile is noise and shows no structure even when the mapping is correct.
+        // Summing |x|^2 over 12 REs averages the noise down by sqrt(12) and leaves |h_a|^2*E|s|^2.
+        // PRB 26, NOT nrb/2. For 106 PRB in a 1536-pt FFT first_carrier_offset=900, so PRB 53
+        // maps to raw subcarriers 0..11 — straddling DC, where there is no signal. Sampling there
+        // gave a flat NOISE profile and made the RU/DU comparison meaningless. PRB 26 sits at raw
+        // 1212, well inside the band. The DU logs its |h| at the same PRB.
+        // SELF-LOCATING. Fixed PRBs kept missing the signal: PRB 53 straddles DC (raw 0..11 for
+        // 106 PRB, first_carrier_offset=900) and PRB 26 read 7-13 rms == the thermal floor
+        // (sqrt(2)*sigma = 9.9 at VRTSIM_RX_NOISE_SIGMA=7), i.e. outside the UE's allocation.
+        // Scan every PRB for total power and profile the STRONGEST one, so the probe finds the
+        // allocation instead of assuming it. Report the PRB so it can be matched to the DU's
+        // rb_start (the DU's extracted domain is allocation-relative, this is absolute).
+        int fp_prb = 0;
+        long long best = -1;
+        for (int p = 0; p < nrb; p++) {
+          long long tot = 0;
+          for (int a = 0; a < ((n_w < n_ant) ? n_w : n_ant); a++)
+            for (int k = 0; k < 12; k += 3) {
+              const int re = (fp->first_carrier_offset + p * 12 + k) % fp->ofdm_symbol_size;
+              const long long xr = ant_ptr[a][re].r, xi = ant_ptr[a][re].i;
+              tot += xr * xr + xi * xi;
+            }
+          if (tot > best) { best = tot; fp_prb = p; }
+        }
+        char xb[320];
+        int xo = 0;
+        for (int a = 0; a < ((n_w < n_ant) ? n_w : n_ant); a++) {
+          long long p = 0;
+          for (int k = 0; k < 12; k++) {
+            const int re = (fp->first_carrier_offset + fp_prb * 12 + k) % fp->ofdm_symbol_size;
+            const long long xr = ant_ptr[a][re].r, xi = ant_ptr[a][re].i;
+            p += xr * xr + xi * xi;
+          }
+          xo += snprintf(xb + xo, sizeof(xb) - xo, "%ld,", (long)llrint(sqrt((double)p / 12.0)));
+        }
+        LOG_A(PHY, "[CATB XPROF] slot=%d sym=%d prb=%d rms|x_a|=%s\n", slot, symbol, fp_prb, xb);
+      }
     }
     static long nprobe = 0;
     // w[0..3] so the APPLIED vector can be diffed element-wise against the DU's ASSUMED vector
@@ -1428,9 +1490,9 @@ static void receive_pusch_catb(void *args)
     // from "right vector, bad scaling" — the ratios disagreed 7x and that was as far as they went.
     if (m0 > 0 && (nprobe++ % 500) == 0)
       LOG_A(PHY, "[CATB MAG-A] slot=%d sym=%d n_w=%d |combined|=%ld |ant0|=%ld ratio=%.3f "
-                 "w[0..3]=(%d,%d)(%d,%d)(%d,%d)(%d,%d)\n",
+                 "w_re[0..7]=%d,%d,%d,%d,%d,%d,%d,%d\n",
             slot, symbol, n_w, mc, m0, (double)mc / (double)m0,
-            w[0], w[1], w[2], w[3], w[4], w[5], w[6], w[7]);
+            w[0], w[2], w[4], w[6], w[8], w[10], w[12], w[14]);
   }
   // ponytail: single layer. The DU only puts layer 0's weights on the wire today
   // (oaioran.c catb_bfw_attach hardcodes layer 0), so there is no second weight vector to apply.

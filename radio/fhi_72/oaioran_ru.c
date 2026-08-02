@@ -1019,16 +1019,30 @@ int32_t process_ru_cplane(struct rte_mbuf *pkt, void *handle, uint16_t port_id, 
             n_ef++;
             // ext-1 follows the section1 body. Do NOT rte_pktmbuf_adj here: the U-plane path
             // below still needs the mbuf intact, and this probe must stay read-only.
+            // OFFSET (§27): the ext-1 header is THREE bytes — extType:7+ef:1, extLen,
+            // bfwCompMeth:4+bfwIqWidth:4 — and for compMeth=0 there is NO bfwCompParam octet.
+            // This read used `+4`, one byte too far, which shifted every I/Q sample by a byte.
+            // MEASURED with a synthetic ramp: DU sent `f0 00 00 00 e0 01 00 00`, RU saw
+            // `00 00 00 e0 01 00 00 d0` — the same bytes offset by one. extLen=17 => 68 bytes
+            // total = 3 header + 64 IQ (16 ant x 4 B) + 1 pad, which confirms the 3-byte header.
             const struct xran_cp_radioapp_section_ext1 *ext =
                 (const struct xran_cp_radioapp_section_ext1 *)((const uint8_t *)section
                                                                + sizeof(struct xran_cp_radioapp_section1));
             // Decode the weight vector. Layout after the 4-byte ext-1 header (extType/ef, extLen,
             // bfwCompHdr) is (bfwI,bfwQ)+ as int16 big-endian, nAntElmTRx pairs. compMeth 0 =
             // uncompressed, iqWidth 0 = 16 bit -> 4 B/antenna, so n_ant = (extLen*4 - 4) / 4.
+            { static long nb = 0;
+              if ((nb++ % 20000) == 1) {
+                const uint8_t *b = (const uint8_t *)ext + sizeof(*ext); // 3-byte ext-1 header
+                LOG_A(HW, "[CATB BYTES-RU] extType=%u extLen=%u compMeth=%u iqWidth=%u raw="
+                          "%02x %02x %02x %02x %02x %02x %02x %02x\n",
+                      ext->extType, ext->extLen, ext->bfwCompMeth, ext->bfwIqWidth,
+                      b[0], b[1], b[2], b[3], b[4], b[5], b[6], b[7]);
+              } }
             if (ext->extType == 1 && ext->bfwCompMeth == 0 && ext->bfwIqWidth == 0) {
               const int n_ant = ((int)ext->extLen * 4 - 4) / 4;
               if (n_ant > 0 && n_ant <= CATB_MAX_BFW_ANT) {
-                const uint8_t *p = (const uint8_t *)ext + 4;
+                const uint8_t *p = (const uint8_t *)ext + sizeof(*ext); // 3-byte ext-1 header
                 // Store for EVERY symbol this section covers, exactly as pusch_config does below.
                 // Keying only start_symbol would leave the other data symbols weightless and they
                 // would silently fall through to per-antenna — the partial-coverage failure mode.
