@@ -33,3 +33,7 @@ nfapi_nr_interface_scf
 *.log
 *.out
 CMakeUserPresets.json
+
+# build artifacts must not be tracked (2.1 GB, 22767 files; the existing rule
+# only covered cmake_targets/*/build/, not the top-level build dir used by CI/dev)
+/build/
