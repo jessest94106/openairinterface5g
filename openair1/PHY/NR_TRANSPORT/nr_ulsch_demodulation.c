@@ -704,7 +704,7 @@ static void nr_ulsch_construct_HhH_elements(c16_t *conjch00_ch00,
 //     W  = G^-1 H^H            (2 x n_ant)
 // One PRB-centre RE rather than an average over 12: MMSE weights vary slowly across a PRB
 // (that is the premise of per-PRB weighting), and this runs in the DU's per-slot hot path.
-// ponytail: double precision, normalised per PRB — magnitude is arbitrary for a combiner,
+// NOTE: double precision, normalised per PRB — magnitude is arbitrary for a combiner,
 // only the relative pattern across antennas carries information, and the STEP 2 acceptance
 // check is that the per-antenna PHASE matches the configured CDL arrival angles.
 // Returns the number of PRBs left ZEROED because G was singular. A publish that zeroed every PRB

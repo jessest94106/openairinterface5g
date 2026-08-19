@@ -1312,7 +1312,7 @@ static void receive_pusch_catb(void *args)
               "Cat-B UL combine: n_ant %d (max %d) ofdm_symbol_size %d (max %d)\n",
               n_ant, CATB_MAX_ANT, fp->ofdm_symbol_size, CATB_MAX_FFT);
   if (tls_buf == NULL) {
-    // ponytail: never freed — worker threads live for the process.
+    // NOTE: never freed — worker threads live for the process.
     tls_buf = aligned_alloc(32, (size_t)(CATB_MAX_ANT + 1) * CATB_MAX_FFT * sizeof(c16_t));
     AssertFatal(tls_buf != NULL, "Cat-B UL combine: out of memory\n");
   }
@@ -1364,15 +1364,12 @@ static void receive_pusch_catb(void *args)
       ru->ifdevice.xran_api.write_pusch((uint32_t *)rxdataF[a], a, frame, slot, symbol);
     return;
   }
-  if (0) {
-    // DATA symbol with no weights yet. Do NOT fall back to per-antenna: the DU treats every data
-    // symbol as combined, so falling back makes the two sides disagree about the contents of the
-    // same symbol and every TB spanning them dies (measured: 30% fallback => 0 Mbps). Emit
-    // antenna 0 alone, which is exactly the degenerate weight the DU's own fallback assumes
-    // (unit on antenna 0, zero elsewhere). Consistent and decodable, just without array gain.
-    ru->ifdevice.xran_api.write_pusch((uint32_t *)rxdataF[0], 0, frame, slot, symbol);
-    return;
-  }
+  // REJECTED ALTERNATIVE, kept as a note: on a DATA symbol with no weights yet, do NOT emit
+  // antenna 0 alone as a degenerate fallback. The DU treats every data symbol as combined, so a
+  // per-antenna fallback makes the two sides disagree about the contents of the same symbol and
+  // every TB spanning them dies (measured: 30% fallback => 0 Mbps). The branch above — forward
+  // ALL antennas when n_w <= 0 — is the consistent choice, because the DU's own fallback assumes
+  // exactly that.
 
   catb_combine_ul(ant_ptr, combined_buf, (n_w < n_ant) ? n_w : n_ant, fp->ofdm_symbol_size, w);
   // PROBE A (§21). The DU decodes the combined stream as pure noise (pwr == npwr, llr 0) even with
@@ -1494,7 +1491,7 @@ static void receive_pusch_catb(void *args)
             slot, symbol, n_w, mc, m0, (double)mc / (double)m0,
             w[0], w[2], w[4], w[6], w[8], w[10], w[12], w[14]);
   }
-  // ponytail: single layer. The DU only puts layer 0's weights on the wire today
+  // NOTE: single layer. The DU only puts layer 0's weights on the wire today
   // (oaioran.c catb_bfw_attach hardcodes layer 0), so there is no second weight vector to apply.
   // Second layer = DU emits per-layer BFW on distinct eAxC, then write_pusch(.., 1, ..) here.
   ru->ifdevice.xran_api.write_pusch((uint32_t *)combined_buf, 0, frame, slot, symbol);

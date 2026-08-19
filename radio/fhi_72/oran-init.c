@@ -407,7 +407,7 @@ static void oran_allocate_buffers(void *handle,
   // belong to xran_5g_fronthault_config() and xran writes received weight sections into whatever
   // is handed to xran_5g_bfw_config(). Allocated only when the feature is on, so the default path
   // keeps its exact current memory footprint (Cat-A regression safety).
-  // ponytail: RX map seeded from ulConf because our BFW arrives on UL C-plane sections; the sample
+  // NOTE: RX map seeded from ulConf because our BFW arrives on UL C-plane sections; the sample
   // app seeds both from its DL map. If sections fail to match a prbMapElm, try dlConf here — the
   // failure mode is dropped weights, not corruption.
   const int catb_bfw_rx = catb_bfw_rx_enabled();

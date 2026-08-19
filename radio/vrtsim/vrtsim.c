@@ -447,7 +447,7 @@ static void vrtsim_readconfig(vrtsim_state_t *vrtsim_state)
   // from fixed, widely separated start offsets: the separation is constant because every antenna
   // advances by the same 2*nsamps each slot, so no two antennas ever read the same entry at the
   // same instant -> the draws stay spatially independent, which is what MRC array gain needs.
-  // ponytail: 2^23 entries = 16 MB = 34 ms of sim time at 122.88 Msps before an antenna's sequence
+  // NOTE: 2^23 entries = 16 MB = 34 ms of sim time at 122.88 Msps before an antenna's sequence
   // repeats (32x the 1.07 ms period the AGC path already shipped with). If a run ever needs a
   // longer decorrelation time than that, raise VRTSIM_NOISE_TAB_LOG2 — cost is linear in memory.
   vrtsim_state->rx_noise_tab = NULL;
@@ -1859,7 +1859,7 @@ static int vrtsim_read(openair0_device_t *device, openair0_timestamp_t *ptimesta
   }
   int rx_ret = 0;
   // Cat-B STEP 0: measure the RU's UL combine cost before spatial combining moves into it.
-  // ponytail: CLOCK_MONOTONIC around the server branch, no per-antenna breakdown — the gate
+  // NOTE: CLOCK_MONOTONIC around the server branch, no per-antenna breakdown — the gate
   // only needs headroom against the 25 ms wall budget (TS=0.02 gives a 0.5 ms slot 25 ms of
   // wall time regardless of sample rate).
   struct timespec catb_t0;
